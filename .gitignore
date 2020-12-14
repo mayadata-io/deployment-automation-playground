@@ -1,3 +1,7 @@
+# Good general ignores:
+*~
+*#
+
 # Local .terraform directories
 **/.terraform/*
 
