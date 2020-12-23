@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+    name: fetch-from-minio-pod
+spec:
+  volumes:
+  - name: fetch-from-minio-storage
+    persistentVolumeClaim:
+      claimName: fetch-from-minio-pvc 
+  containers:
+  - name: fetch-most-recently-created-minio-bucket
+    image: watcher00090/deployment-automation-playground-fetch-from-minio
+    stdin: true
+    volumeMounts:
+    - mountPath: "/mnt/localpv-vol-0"
+      name: fetch-from-minio-storage
