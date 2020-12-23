@@ -18,5 +18,5 @@ spec:
       - matchExpressions:
         - key: kubernetes.io/hostname
           operator: In
-          values: # hostname of the master
-          - ip-10-0-171-100
+          values: # hostname of the first worker
+          - ip-10-0-93-244
