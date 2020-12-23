@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minio
+  labels:
+    workflows.argoproj.io/archive-strategy: "false"
+spec:
+  project: default
+  source:
+    helm:
+      valuesLiteral:
+      - name: override.yaml
+        value: |
+           accessKey: foo
+           secretKey: barbarbarbar
+    path: minio
+    repoURL: https://github.com/minio/charts.git
+  destination:
+    server: https://api.test444.bob.bmath.nyc
+    namespace: minio
