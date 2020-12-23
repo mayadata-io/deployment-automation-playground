@@ -3,7 +3,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: fetch-from-minio-pvc
 spec:
-  storageClassName: manual
+  storageClassName: local-storage
   accessModes:
   - ReadWriteMany
   resources:
