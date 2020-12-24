@@ -11,4 +11,4 @@ spec:
       targetPort: 9000
       protocol: TCP
     externalIPs:
-    - 3.133.140.118
+    - 3.15.232.78

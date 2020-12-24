@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: minio-deployment
+    labels:
+        name: minio-deployment
+spec:
+    replicas: 2
+    selector:
+      matchLabels: 
+        name: minio-pod
+    template:
+        metadata:
+          labels:
+             name: minio-pod
+        spec:
+            containers:
+            - name: minio-container
+              image: minio/minio
+              env: 
+              - name: MINIO_ACCESS_KEY
+                value: "HKJSDF98jkd76hjsDJKSDjk"
+              - name: MINIO_SECRET_KEY
+                value: "kd89jk3298sdkjHJKDSds89ds/87sd87*"
+              command: ["minio"]
+              args: ["server", "/data"]
+              ports:
+              - containerPort: 9000
