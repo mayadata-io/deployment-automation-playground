@@ -32,9 +32,9 @@ def main():
     # Create a client with the MinIO server playground, its access key
     # and secret key.
     client = Minio(
-        "3.133.140.118:31030",
-        access_key="HKJSDF98jkd76hjsDJKSDjk",
-        secret_key="kd89jk3298sdkjHJKDSds89ds/87sd87*",
+        os.environ['MINIO_SERVER_AND_PORT'],
+        access_key=os.environ['MINIO_ACCESS_KEY'],
+        secret_key=os.environ['MINIO_SECRET_KEY'],
         secure=False,
     )
     new_bucket_str = make_new_bucket_string();
