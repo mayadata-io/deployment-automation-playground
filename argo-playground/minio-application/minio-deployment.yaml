@@ -19,9 +19,15 @@ spec:
               image: minio/minio
               env: 
               - name: MINIO_ACCESS_KEY
-                value: "HKJSDF98jkd76hjsDJKSDjk"
+                valueFrom: 
+                  secretKeyRef:
+                    name: minio-server-authentication-info
+                    key: MINIO_ACCESS_KEY
               - name: MINIO_SECRET_KEY
-                value: "kd89jk3298sdkjHJKDSds89ds/87sd87*"
+                valueFrom: 
+                  secretKeyRef:
+                    name: minio-server-authentication-info
+                    key: MINIO_SECRET_KEY
               command: ["minio"]
               args: ["server", "/data"]
               ports:
