@@ -1,0 +1,68 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+    generateName: minio-push-and-pull-
+spec:
+    volumeClaimTemplates:
+    - metadata:
+        name: fetch-from-minio-pvc
+      spec:
+        storageClassName: local-storage
+        accessModes: 
+        - ReadWriteMany
+        resources:
+          requests:
+            storage: 3Gi
+
+    entrypoint: minio-sequence
+    
+    templates:
+    - name: minio-sequence
+      steps:
+      - - name: upload-to-minio
+          template: upload-to-minio
+
+      - - name: sleep-for-5-seconds
+          template: sleep-for-5-seconds
+
+      - - name: fetch-from-minio
+          template: fetch-from-minio
+
+      - - name: repeat
+          template: minio-sequence
+
+    - name: upload-to-minio
+      container:
+        image: watcher00090/deployment-automation-playground-upload-to-minio
+        #command: ["python"]
+        #args: ["./upload-to-minio.py"]
+        env: 
+        - name: MINIO_SERVER_AND_PORT
+          value: '3.15.232.78:32477'
+        - name: MINIO_ACCESS_KEY
+          value: 'HKJSDF98jkd76hjsDJKSDjk'
+        - name: MINIO_SECRET_KEY
+          value: 'kd89jk3298sdkjHJKDSds89ds/87sd87*'
+
+    - name: fetch-from-minio
+      container: 
+        image: watcher00090/deployment-automation-playground-fetch-from-minio
+        #command: ["python"]
+        #args: ["./fetch-from-minio.py"]
+        env: 
+        - name: MINIO_SERVER_AND_PORT
+          value: '3.15.232.78:32477'
+        - name: MINIO_ACCESS_KEY
+          value: 'HKJSDF98jkd76hjsDJKSDjk'
+        - name: MINIO_SECRET_KEY
+          value: 'kd89jk3298sdkjHJKDSds89ds/87sd87*'
+        volumeMounts:
+        - name: fetch-from-minio-pvc
+          mountPath: '/mnt/localpv-vol-0'
+
+    
+    - name: sleep-for-5-seconds      
+      container:
+        image: ubuntu
+        command: [sleep]
+        args: ["5s"]
