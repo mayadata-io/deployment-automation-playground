@@ -19,4 +19,4 @@ spec:
         - key: kubernetes.io/hostname
           operator: In
           values: # hostname of the first worker
-          - ip-10-0-93-244
+          - ip-172-20-57-85.us-east-2.compute.internal
