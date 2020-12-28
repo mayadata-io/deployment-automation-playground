@@ -34,28 +34,36 @@ spec:
     - name: upload-to-minio
       container:
         image: watcher00090/deployment-automation-playground-upload-to-minio
-        #command: ["python"]
-        #args: ["./upload-to-minio.py"]
         env: 
         - name: MINIO_SERVER_AND_PORT
           value: '3.15.232.78:32477'
         - name: MINIO_ACCESS_KEY
-          value: 'HKJSDF98jkd76hjsDJKSDjk'
+          valueFrom: 
+            secretKeyRef:
+              name: minio-server-authentication-info
+              key: MINIO_ACCESS_KEY
         - name: MINIO_SECRET_KEY
-          value: 'kd89jk3298sdkjHJKDSds89ds/87sd87*'
+          valueFrom: 
+            secretKeyRef:
+              name: minio-server-authentication-info
+              key: MINIO_SECRET_KEY
 
     - name: fetch-from-minio
       container: 
         image: watcher00090/deployment-automation-playground-fetch-from-minio
-        #command: ["python"]
-        #args: ["./fetch-from-minio.py"]
         env: 
         - name: MINIO_SERVER_AND_PORT
           value: '3.15.232.78:32477'
         - name: MINIO_ACCESS_KEY
-          value: 'HKJSDF98jkd76hjsDJKSDjk'
+          valueFrom: 
+            secretKeyRef:
+              name: minio-server-authentication-info
+              key: MINIO_ACCESS_KEY
         - name: MINIO_SECRET_KEY
-          value: 'kd89jk3298sdkjHJKDSds89ds/87sd87*'
+          valueFrom: 
+            secretKeyRef:
+              name: minio-server-authentication-info
+              key: MINIO_SECRET_KEY
         volumeMounts:
         - name: fetch-from-minio-pvc
           mountPath: '/mnt/localpv-vol-0'

@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: minio-dump-local-pv
+  generateName: minio-dump-local-pv-
 spec:
   capacity:
-    storage: 10Gi
+    storage: 3Gi
   volumeMode: Filesystem
   accessModes:
   - ReadWriteMany
