@@ -1,5 +1,3 @@
-provider "kubernetes" {}
-
 resource "kubernetes_persistent_volume_claim" "minio-dump-pvc" {
     metadata {
         name = "minio-dump-pvc"
@@ -13,6 +11,9 @@ resource "kubernetes_persistent_volume_claim" "minio-dump-pvc" {
             }
         }
     }
+
+    wait_until_bound = false
+
     timeouts {
         create = "1m"
     }

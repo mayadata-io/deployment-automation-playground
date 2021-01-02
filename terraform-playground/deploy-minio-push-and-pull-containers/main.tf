@@ -12,7 +12,13 @@ variable "globals" {
     })
 }
 
+# first resource in the module to be created
+resource "time_sleep" "wait_4_minutes" {
+  create_duration = "4m"
+}
+
 resource "kubernetes_job" "minio-push-and-pull-job" {
+    depends_on = [time_sleep.wait_4_minutes]
 
     metadata {
         generate_name = "minio-push-and-pull-job-"
@@ -20,7 +26,7 @@ resource "kubernetes_job" "minio-push-and-pull-job" {
     spec { 
         template {
             metadata {
-                generate_name = "minio-push-and-pull-job-pod-"
+                generate_name = "minio-push-and-pull-job-"
             }
             spec {
                 init_container {
@@ -55,7 +61,8 @@ resource "kubernetes_job" "minio-push-and-pull-job" {
                     name = "sleep"
                     image = "ubuntu"
                     image_pull_policy = "IfNotPresent"
-                    command = ["sleep 5"]
+                    command = ["sleep"]
+                    args = ["5"]
                 }
                 init_container {
                     name = "fetch-from-minio"

@@ -2,7 +2,7 @@ provider "kubernetes" {}
 
 resource "kubernetes_pod" "minio-pod-resource" {
     metadata {
-        generate_name = "minio-pod-"
+        name = "minio-pod"
         labels = {
             name = "minio-pod"
         }
@@ -70,4 +70,5 @@ data "kubernetes_service" "minio-service-ip-data-source" {
     
 output "minio_service_ingress_ip" {
     value = "${data.kubernetes_service.minio-service-ip-data-source.load_balancer_ingress.0.hostname}"
+    #value = "${data.kubernetes_service.minio-service-ip-data-source.0.load_balancer_ingress.ip}"
 }
