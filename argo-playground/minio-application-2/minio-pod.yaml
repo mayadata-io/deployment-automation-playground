@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Pod
+metadata:
+    name: minio-pod
+    labels:
+        name: minio-pod
+spec:
+    containers:
+    - name: minio-container
+      image: minio/minio
+      env: 
+      - name: MINIO_ACCESS_KEY
+        valueFrom:
+          secretKeyRef:
+            name: minio-server-authentication-info
+            key: MINIO_ACCESS_KEY
+      - name: MINIO_SECRET_KEY
+        valueFrom:
+          secretKeyRef:
+            name: minio-server-authentication-info
+            key: MINIO_SECRET_KEY
+      command: ["minio"]
+      args: ["server", "/data"]
+      ports:
+      - containerPort: 9000
+    restartPolicy: OnFailure
