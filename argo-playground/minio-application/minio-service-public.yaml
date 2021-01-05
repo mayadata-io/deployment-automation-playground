@@ -3,12 +3,10 @@ kind: Service
 metadata:
     name: minio-service
 spec:
-    type: NodePort
+    type: LoadBalancer
     selector: 
         name: minio-pod
     ports:
     - port: 9000 
       targetPort: 9000
       protocol: TCP
-    externalIPs:
-    - 3.15.232.78
