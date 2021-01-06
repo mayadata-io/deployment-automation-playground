@@ -1,10 +1,10 @@
-terraform {
-    required_providers {
-        kubernetes = {
-            source = "hashicorp/kubernetes"
-        }
-    }
-}
+#terraform {
+#    required_providers {
+#        kubernetes = {
+#            source = "hashicorp/kubernetes"
+#        }
+#    }
+#}
 
 variable "globals" {
     type = object({
