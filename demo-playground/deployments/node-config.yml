@@ -1,0 +1,78 @@
+---
+- name: Mayastor node configuration - workers and storage nodes
+  hosts: workers, mayastor
+  become: true
+
+  vars:
+    kernel_settings_sysctl:
+      - name: vm.nr_hugepages
+        value: 1024
+    kernel_settings_sysfs:
+      - name: /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+        value: 1024
+
+    # Add required package names below
+    deb_prerequisites:
+      - open-iscsi
+    rpm_prerequisites:
+      - iscsi-initiator-utils
+
+    # Add required kmod names below
+    kmods:
+      - nvme-tcp
+      - nvmet
+
+  tasks:
+    - name: install RPM packages
+      yum:
+        name: "{{ rpm_prerequisites }}"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: install DEB packages
+      block:
+        - name: Upgrade all packages to the latest version
+          apt:
+            name: "*"
+            state: latest
+            force_apt_get: yes
+            update_cache: yes
+
+        - name: Install DEB packages
+          apt:
+            name: "{{ deb_prerequisites }}"
+            state: present
+            force_apt_get: yes
+      when: ansible_os_family == "Debian"
+
+    - name: enable and start the iscsid service
+      service:
+        name: iscsid
+        enabled: yes
+        state: started
+
+    - name: enable the NVMe kmods
+      modprobe:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ kmods }}"
+
+    - name: restart kubelet
+      service:
+        name: kubelet
+        state: restarted
+
+  roles:
+    - linux-system-roles.kernel_settings
+
+
+
+
+
+
+
+
+
+
+
+

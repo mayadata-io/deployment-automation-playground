@@ -1,0 +1,52 @@
+Host ${bastion-ip}
+  IdentityFile ${ssh_key}
+  User ${ssh_user}
+  ControlMaster auto
+  ControlPath ~/.ssh/ansible-%%r@%h:%p
+  ControlPersist 5m
+  UserKnownHostsFile /dev/null
+  TCPKeepAlive yes
+  ServerAliveCountMax 60
+  ServerAliveInterval 60
+  IPQoS throughput
+  StrictHostKeyChecking no
+
+%{ for ip in master-ip ~}
+Host ${ip}
+  ProxyCommand ssh -F ./ssh.cfg -W %h:%p ${bastion-ip}
+  IdentityFile ${ssh_key}
+  User ${ssh_user}
+  UserKnownHostsFile /dev/null
+  TCPKeepAlive yes
+  ServerAliveCountMax 60
+  ServerAliveInterval 60
+  IPQoS throughput
+  StrictHostKeyChecking no
+
+%{ endfor ~}
+%{ for ip in storage-ip ~}
+Host ${ip}
+  ProxyCommand ssh -F ./ssh.cfg -W %h:%p ${bastion-ip}
+  IdentityFile ${ssh_key}
+  User ${ssh_user}
+  UserKnownHostsFile /dev/null
+  TCPKeepAlive yes
+  ServerAliveCountMax 60
+  ServerAliveInterval 60
+  IPQoS throughput
+  StrictHostKeyChecking no
+
+%{ endfor ~}
+%{ for ip in worker-ip ~}
+Host ${ip}
+  ProxyCommand ssh -F ./ssh.cfg -W %h:%p ${bastion-ip}
+  IdentityFile ${ssh_key}
+  User ${ssh_user}
+  UserKnownHostsFile /dev/null
+  TCPKeepAlive yes
+  ServerAliveCountMax 60
+  ServerAliveInterval 60
+  IPQoS throughput
+  StrictHostKeyChecking no
+
+%{ endfor ~}
