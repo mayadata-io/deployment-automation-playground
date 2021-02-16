@@ -108,10 +108,10 @@ run_fio: $RUN_FIO
 EOF
 
 ansible-galaxy role install --force-with-deps -p ./roles linux-system-roles.kernel_settings
-ansible-playbook -vv -i inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
+ansible-playbook -vv -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
 
 ### Mayastor deployment
-ansible-playbook -vv -i inventory.ini -e "@$DIR/workspace/ansible_vars.yml" mayastor.yml
+ansible-playbook -vv -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" mayastor.yml
 cd $DIR
 
 ENDTIME=$(date +%s)
