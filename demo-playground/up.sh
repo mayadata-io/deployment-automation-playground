@@ -21,6 +21,7 @@ source $DIR/vars
 ### PROVISIONING
 cd $DIR/prov/$PLATFORM
 
+#Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
 cat <<EOF >$DIR/workspace/prov.tfvars
 setup_name = "$SETUP_NAME"
 location = "$LOCATION"
@@ -88,6 +89,7 @@ export KUBECONFIG="$DIR/workspace/admin.conf"
 cd $DIR/deployments
 cp -f $DIR/workspace/ssh.cfg .
 
+#Create the vars file, if more variables are introduced, this will need to be extended
 cat <<EOF >$DIR/workspace/ansible_vars.yml
 kernel_settings_sysctl:
   - name: vm.nr_hugepages
@@ -107,7 +109,10 @@ project_namespace: "$PROJECT_NAMESPACE"
 run_fio: $RUN_FIO
 EOF
 
+#Install prerequisite roles and collections
+ansible-galaxy collection install --force-with-deps -p ./collections community.kubernetes
 ansible-galaxy role install --force-with-deps -p ./roles linux-system-roles.kernel_settings
+
 ansible-playbook -vv -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
 
 ### Mayastor deployment
