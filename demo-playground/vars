@@ -1,0 +1,50 @@
+# General variables
+SETUP_NAME="maya-demo"
+SSH_USER="maya-user"
+SSH_KEY=~/.ssh/id_rsa
+SSH_PUBKEY=~/.ssh/id_rsa.pub
+
+# Kubespray release
+KSPRAY_RELEASE="release-2.15"
+
+# Provisioning variables
+# Platform specific vars are expected here, formatting for variables follows the terraform convention
+PLATFORM="azure"
+LOCATION="eastus"
+OS_IMAGE='{
+    publisher = "OpenLogic"
+    offer     = "CentOS"
+    sku       = "8_3-gen2"
+    version   = "latest"
+    }'
+
+STORAGE_NODES='{
+    count        = 3
+    type         = "Standard_L8s_v2"
+    os_disk_size = 50
+    msp          = "/dev/nvme0n1"
+    }'
+MASTER_NODES='{
+    count        = 1
+    type         = "Standard_D2s_v4"
+    os_disk_size = 40
+    }'
+WORKER_NODES='{
+    count        = 3
+    type         = "Standard_D8s_v4"
+    os_disk_size = 40
+    }'
+
+#Node tuning variables
+NR_HUGEPAGES=1024
+
+#Mayastor variables
+CPU_LIMIT=6
+MEMORY_LIMIT="1024Mi"
+HUGEPAGES_2MI="2Gi"
+STORAGE_PROTOCOL="nvmf"
+REPLICA_COUNT=3
+PVC_SIZE="100Gi"
+PROJECT_NAMESPACE="default"
+RUN_FIO="false"
+
