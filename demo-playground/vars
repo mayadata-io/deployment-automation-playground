@@ -44,7 +44,9 @@ MEMORY_LIMIT="1024Mi"
 HUGEPAGES_2MI="2Gi"
 STORAGE_PROTOCOL="nvmf"
 REPLICA_COUNT=3
-PVC_SIZE="100Gi"
 PROJECT_NAMESPACE="default"
 RUN_FIO="false"
+
+#List of PVC dicts containing name:size
+PVC='[{"name":"pvc1","size":"100Gi"},{"name":"pvc2","size":"200Gi"},{"name":"pvc3","size":"300Gi"}]'
 

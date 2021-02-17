@@ -12,7 +12,15 @@
 
       #if no replica_count is defined, it defaults to the number of mayastor nodes
     #replica_count: 3
-    pvc_size: 100Gi
+
+    #create the following PVCs
+    pvc:
+      - name: pvc1
+        size: 50Gi
+      - name: pvc2
+        size: 20Gi
+      - name: pvc3
+        size: 100Gi
 
     #set the required namespace here, if not set, will default to "default"
     #project_namespace: myproject
@@ -232,26 +240,33 @@
 
     - name: Create a Persistent Volume Claim
       block:
+        - debug:
+            var: pvc
+
         - name: create PVC definition
           template:
             src: templates/pvc.yaml.j2
-            dest: "{{ DIR }}/workspace/pvc.yaml"
+            dest: "{{ DIR }}/workspace/pvc-{{ item.name }}.yaml"
           vars:
             sc_name: "mayastor-{{ storage_protocol }}"
+            pvc_name: "{{ item.name }}"
+            pvc_size: "{{ item.size }}"
+          loop: "{{ pvc }}"
 
         - name: create pvc
           k8s:
             state: present
             namespace: "{{ project_namespace|default('default') }}"
             kubeconfig: "{{ DIR }}/workspace/admin.conf"
-            src: "{{ DIR }}/workspace/pvc.yaml"
+            src: "{{ DIR }}/workspace/pvc-{{ item.name }}.yaml"
+          loop: "{{ pvc }}"
 
-        - name: extract the volume from PVC
+        - name: extract the volume from the first PVC
           k8s_info:
             kubeconfig: "{{ DIR }}/workspace/admin.conf"
             namespace: "{{ project_namespace|default('default') }}"
             kind: PersistentVolumeClaim
-            name: "ms-volume-claim"
+            name: "{{ pvc[0].name }}"
             api_version: "v1"
           register: _pvc
           until: _pvc['resources'][0]['status']['phase'] == "Bound"

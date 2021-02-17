@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: ms-volume-claim
+  name: "{{ pvc_name }}"
 spec:
   accessModes:
   - ReadWriteOnce

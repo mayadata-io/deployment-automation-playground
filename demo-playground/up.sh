@@ -12,10 +12,8 @@ secs_to_human() {
 
 STARTTIME=$(date +%s)
 
-### READ THE vars FILE
 DIR=${PWD}
 if [ ! -d workspace ]; then mkdir workspace; fi
-
 source $DIR/vars
 
 ### PROVISIONING
@@ -71,10 +69,10 @@ fi
 crudini --inplace --set ansible.cfg ssh_connection control_path "~/.ssh/ansible-%%r@%%h:%%p"
 
 # Wait for nodes to come up and become available
-ansible -m wait_for_connection -i inventory/$SETUP_NAME/inventory.ini -vv all
+ansible -m wait_for_connection -i inventory/$SETUP_NAME/inventory.ini all
 
 # Deploy Kubespray
-ansible-playbook -vv -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root cluster.yml
+ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root cluster.yml
 
 ### EXTRACT KUBECONFIG AND START VPN
 cd $DIR/workspace
@@ -104,7 +102,7 @@ limits:
   hugepages2Mi: "$HUGEPAGES_2MI"
 storage_protocol: "$STORAGE_PROTOCOL"
 replica_count: $REPLICA_COUNT
-pvc_size: "$PVC_SIZE"
+pvc: $PVC
 project_namespace: "$PROJECT_NAMESPACE"
 run_fio: $RUN_FIO
 EOF
@@ -113,10 +111,10 @@ EOF
 ansible-galaxy collection install --force-with-deps -p ./collections community.kubernetes
 ansible-galaxy role install --force-with-deps -p ./roles linux-system-roles.kernel_settings
 
-ansible-playbook -vv -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
+ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
 
 ### Mayastor deployment
-ansible-playbook -vv -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" mayastor.yml
+ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" mayastor.yml
 cd $DIR
 
 ENDTIME=$(date +%s)

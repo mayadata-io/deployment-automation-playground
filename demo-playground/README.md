@@ -4,6 +4,7 @@ This is a set of scripts that provision cloud instances, deploy K8S, tune nodes 
 
 Provisioning is done via Terraform
 The rest is done by Ansible
+The glue script representing a pipeline is `up.sh`
 
 ## General approach
 
@@ -11,13 +12,13 @@ Each part of the process can be decoupled from the rest. We can skip provisionin
 
 ## Workflow
 
-### Provision a cluster, deploy mayastor:
+### Provision a cluster, deploy mayastor
 
 1. Edit the `vars` file. Once support for additional platforms is present, the platform specific variables need to be set correctly as per the platform.
 2. Run `up.sh`
 3. Wait...
 
-### Teardown the setup:
+### Teardown the setup
 
 Run `down.sh`
 

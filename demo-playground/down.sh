@@ -10,7 +10,7 @@ STARTTIME=$(date +%s)
 DIR="$PWD"
 source $DIR/vars
 cd $DIR/prov/$PLATFORM
-terraform destroy -auto-approve
+terraform destroy -auto-approve -var-file=$DIR/workspace/prov.tfvars
 cd $DIR
 rm -rf workspace kubespray
 ENDTIME=$(date +%s)
