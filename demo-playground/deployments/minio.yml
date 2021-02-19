@@ -41,18 +41,20 @@
         state: present
 
     # TODO replace this with the username in the ssh configuration
-    - name: Alias pip3 as pip
-      shell: echo "alias 'pip=pip3'" >> ~/.bashrc && source ~/.bashrc
-      args:
-        executable: bash
-      become_user: maya-user
+    # - name: Alias pip3 as pip
+    #  shell: echo "alias 'pip=pip3'" >> ~/.bashrc
+    #  args:
+    #    executable: bash
+    #  become_user: maya-user
 
     # TODO replace this with the username in the ssh configuration
     - name: Install pyYAML (a requirement for the community.kubernetes.helm plugin)
-      shell: pip install PyYAML
+      shell: pip3 install PyYAML
       args:
         executable: bash 
       become_user: maya-user
+
+      ## TODO REFRESH SNAP LIST BEFORE TRYING TO INSTALL HELM
     
     - name: Install helm (for installing OpenEBS)  
       community.general.snap:
