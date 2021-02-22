@@ -19,6 +19,7 @@
 
     # Add required kmod names below
     kmods:
+      - nvme-core
       - nvme-tcp
       - nvmet
 
@@ -51,7 +52,21 @@
         enabled: yes
         state: started
 
-    - name: enable the NVMe kmods
+    - name: create config file for nvme-multipath
+      lineinfile:
+        path: /etc/modprobe.d/nvme-multipath
+        line: 'options nvme_core multipath=1'
+        state: present
+        create: yes
+      register: nvme_mp_created
+      when: ansible_os_family == "RedHat"
+
+    - name: Reboot (because kmod reload doesn't usually work)
+      reboot:
+        reboot_timeout: 3600
+      when: nvme_mp_created.changed
+
+    - name: load the NVMe kmods
       modprobe:
         name: "{{ item }}"
         state: present
@@ -61,6 +76,7 @@
       service:
         name: kubelet
         state: restarted
+
 
   roles:
     - linux-system-roles.kernel_settings
