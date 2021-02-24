@@ -19,7 +19,7 @@ variable "image" {
     user   = string
   })
   default = {
-    ami_id = "ami-056b03dba13a2c9dd"
+    ami_id = "ami-0d6e9a57f6259ba3a"
     user   = "centos"
   }
 }
