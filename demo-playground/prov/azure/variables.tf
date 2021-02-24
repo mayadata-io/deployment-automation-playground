@@ -1,7 +1,7 @@
 variable "setup_name" {
   type        = string
   description = "Name for the setup, all the resources will have their own names prepended with it"
-  default     = "temenos"
+  default     = "demo"
 }
 
 variable "location" {
@@ -29,7 +29,7 @@ variable "image" {
 #ssh connection vars
 variable "ssh_user" {
   type = string
-  default = "dyasny"
+  default = "demo-user"
 }
 
 variable "ssh_private_key" {
