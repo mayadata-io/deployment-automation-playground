@@ -1,6 +1,9 @@
 # General variables
 SETUP_NAME="maya-demo"
-SSH_USER="maya-user"
+
+# SSH connection
+# NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
+SSH_USER="centos"
 SSH_KEY=~/.ssh/id_rsa
 SSH_PUBKEY=~/.ssh/id_rsa.pub
 
@@ -9,29 +12,52 @@ KSPRAY_RELEASE="release-2.15"
 
 # Provisioning variables
 # Platform specific vars are expected here, formatting for variables follows the terraform convention
-PLATFORM="azure"
-LOCATION="eastus"
-OS_IMAGE='{
-    publisher = "OpenLogic"
-    offer     = "CentOS"
-    sku       = "8_3-gen2"
-    version   = "latest"
-    }'
+#PLATFORM="azure"
+#LOCATION="eastus"
+#OS_IMAGE='{
+#    publisher = "OpenLogic"
+#    offer     = "CentOS"
+#    sku       = "8_3-gen2"
+#    version   = "latest"
+#    }'
+#
+#STORAGE_NODES='{
+#    count        = 3
+#    type         = "Standard_L8s_v2"
+#    os_disk_size = 50
+#    msp          = "/dev/nvme0n1"
+#    }'
+#MASTER_NODES='{
+#    count        = 1
+#    type         = "Standard_D2s_v4"
+#    os_disk_size = 40
+#    }'
+#WORKER_NODES='{
+#    count        = 3
+#    type         = "Standard_D8s_v4"
+#    os_disk_size = 40
+#    }'
 
+PLATFORM="aws"
+LOCATION="us-east-1"
+OS_IMAGE='{
+    ami_id = "ami-0d6e9a57f6259ba3a"
+    user   = "centos"
+    }'
 STORAGE_NODES='{
-    count        = 3
-    type         = "Standard_L8s_v2"
-    os_disk_size = 50
-    msp          = "/dev/nvme0n1"
+    count = 3
+    type = "m5ad.2xlarge"
+    os_disk_size = 40
+    msp = "/dev/nvme0n1"
     }'
 MASTER_NODES='{
-    count        = 1
-    type         = "Standard_D2s_v4"
-    os_disk_size = 40
+    count = 1
+    type = "m5.xlarge"
+    os_disk_size = 60
     }'
 WORKER_NODES='{
-    count        = 3
-    type         = "Standard_D8s_v4"
+    count = 3
+    type = "m5a.2xlarge"
     os_disk_size = 40
     }'
 
