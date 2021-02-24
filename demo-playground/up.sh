@@ -61,12 +61,19 @@ sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" inventory/
 sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
 
 cp -f $DIR/workspace/ssh.cfg .
-ACFG=$(crudini --get ansible.cfg ssh_connection ssh_args)
+# ACFG=$(crudini --get ansible.cfg ssh_connection ssh_args)
 
-if [[ "$ACFG" != *"-F ./ssh.cfg"* ]]; then
-  crudini --inplace --set ansible.cfg ssh_connection ssh_args "$ACFG -F ./ssh.cfg"
-fi
-crudini --inplace --set ansible.cfg ssh_connection control_path "~/.ssh/ansible-%%r@%%h:%%p"
+# if [[ "$ACFG" != *"-F ./ssh.cfg"* ]]; then
+#   crudini --inplace --set ansible.cfg ssh_connection ssh_args "$ACFG -F ./ssh.cfg"
+# fi
+# crudini --inplace --set ansible.cfg ssh_connection control_path "~/.ssh/ansible-%%r@%%h:%%p"
+
+#Start VPN
+BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
+ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
+ansible -m package -a "name=python3" --become -i $DIR/workspace/inventory.ini bastion
+sudo pkill sshuttle || echo "sshuttle starting"
+nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
 
 # Wait for nodes to come up and become available
 ansible -m wait_for_connection -i inventory/$SETUP_NAME/inventory.ini all
@@ -76,9 +83,6 @@ ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=r
 
 ### EXTRACT KUBECONFIG AND START VPN
 cd $DIR/workspace
-BASTION=$(grep -e '^bastion' inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
-sudo pkill sshuttle || echo "sshuttle not active"
-nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
 sleep 5
 ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat /etc/kubernetes/admin.conf" > admin.conf
 export KUBECONFIG="$DIR/workspace/admin.conf"
