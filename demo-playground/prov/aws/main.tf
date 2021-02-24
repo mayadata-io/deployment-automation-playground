@@ -73,7 +73,7 @@ resource "aws_route_table_association" "vpcrtassociation" {
 
 resource "aws_instance" "storage_node" {
   count = var.storage_nodes.count
-  associate_public_ip_address = false
+  associate_public_ip_address = true
   ami = var.image.ami_id
   instance_type = var.storage_nodes.type
   key_name = "${var.setup_name}-keypair"
@@ -110,7 +110,7 @@ resource "aws_instance" "master_node" {
 
 resource "aws_instance" "worker_node" {
   count = var.worker_nodes.count
-  associate_public_ip_address = false
+  associate_public_ip_address = true
   ami = var.image.ami_id
   instance_type = var.worker_nodes.type
   key_name = "${var.setup_name}-keypair"
