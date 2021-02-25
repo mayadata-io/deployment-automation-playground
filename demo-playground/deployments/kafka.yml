@@ -1,0 +1,125 @@
+- name: Install Apache Kafka into the cluster using the Strimzi operator
+- vars:
+    STRIMZI_KAFKA_CLUSTER_RELEASE_NAME: my-release
+    STRIMZI_KAFKA_CLUSTER_CHART_VERSION: 0.21.1
+    STRIMZI_KAFKA_CLUSTER_NAMESPACE: kafka
+
+    # If you'd like to use a specific version of the Strimzi operator helm chart, you can
+    # pass the version to the input variable STRIMZI_KAFKA_CLUSTER_CHART_VERSION and
+    # this playbook will use that version of the chart during installation. Otherwise, the
+    # latest version of the chart will be used. 
+
+- hosts: kube-master
+
+- tasks:
+
+  - name: Ensure that the kubeconfig file for the cluster can be found at $HOME/.kube/config
+    block:
+    - name: Ensure that the $HOME/.kube directory exists
+      ansible.builtin.file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0777
+
+    #- name: Stat $HOME/.kube/config
+    #  ansible.builtin.stat:
+    #    path: $HOME/.kube/config
+    #  register: DEFAULT_KUBECONFIG_FILE_PRESENT
+
+    - name: Copy the kubeconfig from /etc/kubernetes to $HOME/.kube if it's not already there
+      copy: 
+        src: /etc/kubernetes/admin.conf 
+        dest: $HOME/.kube/config
+        remote_src: yes
+        force: yes
+      # when: not DEFAULT_KUBECONFIG_FILE_PRESENT.stat.exists
+
+    - name: Get the user and group ids of the current user, and then acquire ownership of the kubeconfig
+      block: 
+      - name: Obtain and store the user id of this user
+        command: id -u
+        register: REMOTE_HOST_USER_ID
+
+      - name: Obtain and store the group id of this user
+        command: id -u
+        command: REMOTE_HOST_GROUP_ID
+
+      - name: Give ownership of the kubeconfig to this user
+        ansible.builtin.file:
+          path: $HOME/.kube/config
+          user: {{ REMOTE_HOST_USER_ID }}
+          group: {{ REMOTE_HOST_GROUP_ID }}
+
+  - name: Add the Kubernetes repository to the yum repository list
+    yum_repository: 
+      name: kubernetes
+      baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+      enabled: yes
+      description: "k8s repository"
+      gpgcheck: yes
+      repo_gpgcheck: yes
+      gpgkey: 
+        - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+        - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+  - name: Install kubectl from the Kubernetes repository
+    yum:
+      name: kubectl
+      state: present
+
+  - name: Install Helm (for installing OpenEBS)  
+    community.general.snap:
+      name: 
+        - helm
+      classic: yes 
+    
+#  - name: Add the jetstack.io repository to the Helm repository list
+#    community.kubernetes.helm_repository:
+#      name: jetstack
+#      repo_url: https://charts.jetstack.io
+  
+#  - name: Install cert-manager via its helm chart
+#    community.kubernetes.helm:
+#      name: cert-manager
+#      chart_ref: jetstack/cert-manager
+#      repo_url: https://charts.jetstack.io
+#      chart_version: 1.2.0
+#      release_namespace: cert-manager
+#      create_namespace: yes
+
+  - name: Add the Strimzi operator repository to the Helm repository list
+    community.kubernetes.helm_repository:
+      name: strimzi
+      repo_url: https://strimzi.io/charts/
+
+  - name: Create the namespace where the Kafka cluster will live
+    community.kubernetes.k8s: 
+      name: {{ STRIMZI_KAFKA_CLUSTER_NAMESPACE }}
+      api_version: v1
+      kind: Namespace
+      state: present
+  
+  - name: Install the Strimzi Kafka operator into the given namespace
+    block:
+      name: Perform the installation
+      community.kubernetes.helm:
+        name:  {{ STRIMZI_KAFKA_CLUSTER_RELEASE_NAME }}
+        chart_ref: strimzi/strimzi-kafka-operator
+        version: {{ STRIMZI_KAFKA_CLUSTER_CHART_VERSION }}
+        release_namespace: {{ STRIMZI_KAFKA_CLUSTER_NAMESPACE }}
+
+  - name: Copy the spec for the Kafka cluster to the remote machine
+    
+    ansible.builin.copy:
+      src: kafka-cluster.yaml
+      dest: ~/kafka-cluster.yaml
+      remote_src: no
+      force: yes
+    delegate_to: localhost
+    #when: not kafka_template.stat.exists
+
+  - name: Create a Kafka cluster (to be manager by the Strimzi Kafka operator) in the given namespace
+    community.kubernetes.k8s:
+      resource_definition: ~/kafka-cluser.yaml
+      namespace: {{ STRIMZI_KAFKA_CLUSTER_NAMESPACE }}
+
