@@ -58,12 +58,15 @@ function kubespray {
 }
 
 function start_vpn { #Start VPN
+  cd $DIR/deployments
   BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
+  ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
   ansible-playbook -i $DIR/workspace/inventory.ini $DIR/deployments/bastion.yml
   pkill sshuttle || echo "sshuttle starting"
   nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
-  # Wait for nodes to come up and become available
-  ansible -m wait_for_connection -i inventory/$SETUP_NAME/inventory.ini all
+  # Wait for all nodes to come up and become available
+  ansible -m wait_for_connection -i $DIR/workspace/inventory.ini all
+  cd $DIR
 }
 
 function get_kubeconfig { ### EXTRACT KUBECONFIG
@@ -116,21 +119,18 @@ source $DIR/vars
 for s in $STAGES; do
   if [[ "$s" == "prov" ]]; then
     provisioning
-    break
   fi
 done
 
 for s in $STAGES; do
   if [[ "$s" == "start_vpn" ]]; then
     start_vpn
-    break
   fi
 done
 
 for s in $STAGES; do
   if [[ "$s" == "k8s" ]]; then
     $K8S_INSTALLER
-    break
   fi
 done
 
