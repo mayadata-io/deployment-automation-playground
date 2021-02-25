@@ -4,23 +4,14 @@ set -ex -o pipefail
 # required packages:
 # - ansible 2.9.17
 # - pip3
-# - crudini
-
-secs_to_human() {
-    echo "$(( ${1} / 3600 ))h $(( (${1} / 60) % 60 ))m $(( ${1} % 60 ))s"
-}
-
-STARTTIME=$(date +%s)
-
-DIR=${PWD}
-if [ ! -d workspace ]; then mkdir workspace; fi
-source $DIR/vars
 
 ### PROVISIONING
-cd $DIR/prov/$PLATFORM
+function provisioning
+{
+  cd $DIR/prov/$PLATFORM
 
-#Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
-cat <<EOF >$DIR/workspace/prov.tfvars
+    #Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
+  cat <<EOF >$DIR/workspace/prov.tfvars
 setup_name = "$SETUP_NAME"
 location = "$LOCATION"
 ssh_user = "$SSH_USER"
@@ -32,67 +23,63 @@ master_nodes = $MASTER_NODES
 worker_nodes = $WORKER_NODES
 EOF
 
-terraform init
-terraform apply -auto-approve -var-file="$DIR/workspace/prov.tfvars"
+  terraform init
+  terraform apply -auto-approve -var-file="$DIR/workspace/prov.tfvars"
 
-cp -f $DIR/prov/$PLATFORM/inventory.ini $DIR/workspace/
-cp -f $DIR/prov/$PLATFORM/ssh.cfg $DIR/workspace/
+  cp -f $DIR/prov/$PLATFORM/inventory.ini $DIR/workspace/
+  cp -f $DIR/prov/$PLATFORM/ssh.cfg $DIR/workspace/
+}
 
+function kubespray {
 ### K8S deployment
-cd $DIR
-if [ -d kubespray ]; then
-  cd kubespray
-  git pull
-else
-  git clone https://github.com/kubernetes-sigs/kubespray.git
-  cd kubespray
-fi
-git checkout "$KSPRAY_RELEASE"
-pip3 install -r requirements.txt
-pip3 install openshift
-#TODO: move to virtualenv
+  cd $DIR
+  if [ -d kubespray ]; then
+    cd kubespray
+    git pull
+  else
+    git clone https://github.com/kubernetes-sigs/kubespray.git
+    cd kubespray
+  fi
+  git checkout "$KSPRAY_RELEASE"
+  pip3 install -r requirements.txt
+  pip3 install openshift
+  #TODO: move to virtualenv
 
-cp -rfp inventory/sample inventory/$SETUP_NAME
-cp -f $DIR/workspace/inventory.ini inventory/$SETUP_NAME/
+  cp -rfp inventory/sample inventory/$SETUP_NAME
+  cp -f $DIR/workspace/inventory.ini inventory/$SETUP_NAME/
 
-#Remove the bastion group, we don't want to confuse Kubespray
-sed -i '/^bastion/d' inventory/$SETUP_NAME/inventory.ini
-sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
-sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
+  #Remove the bastion group, we don't want to confuse Kubespray
+  sed -i '/^bastion/d' inventory/$SETUP_NAME/inventory.ini
+  sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
+  sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
 
-cp -f $DIR/workspace/ssh.cfg .
-# ACFG=$(crudini --get ansible.cfg ssh_connection ssh_args)
+  # Deploy Kubespray
+  ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root cluster.yml
+}
 
-# if [[ "$ACFG" != *"-F ./ssh.cfg"* ]]; then
-#   crudini --inplace --set ansible.cfg ssh_connection ssh_args "$ACFG -F ./ssh.cfg"
-# fi
-# crudini --inplace --set ansible.cfg ssh_connection control_path "~/.ssh/ansible-%%r@%%h:%%p"
+function start_vpn { #Start VPN
+  BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
+  ansible-playbook -i $DIR/workspace/inventory.ini $DIR/deployments/bastion.yml
+  pkill sshuttle || echo "sshuttle starting"
+  nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
+  # Wait for nodes to come up and become available
+  ansible -m wait_for_connection -i inventory/$SETUP_NAME/inventory.ini all
+}
 
-#Start VPN
-BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
-ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
-ansible -m package -a "name=python3" --become -i $DIR/workspace/inventory.ini bastion
-sudo pkill sshuttle || echo "sshuttle starting"
-nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
-
-# Wait for nodes to come up and become available
-ansible -m wait_for_connection -i inventory/$SETUP_NAME/inventory.ini all
-
-# Deploy Kubespray
-ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root cluster.yml
-
-### EXTRACT KUBECONFIG AND START VPN
-cd $DIR/workspace
-sleep 5
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat /etc/kubernetes/admin.conf" > admin.conf
-export KUBECONFIG="$DIR/workspace/admin.conf"
+function get_kubeconfig { ### EXTRACT KUBECONFIG
+  cd $DIR/workspace
+  sleep 5
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat /etc/kubernetes/admin.conf" > admin.conf
+  export KUBECONFIG="$DIR/workspace/admin.conf"
+}
 
 ### PREPARE NODES
-cd $DIR/deployments
-cp -f $DIR/workspace/ssh.cfg .
+function prep_nodes {
+  cd $DIR/deployments
+  cp -f $DIR/workspace/ssh.cfg .
 
-#Create the vars file, if more variables are introduced, this will need to be extended
-cat <<EOF >$DIR/workspace/ansible_vars.yml
+  #Create the vars file, if more variables are introduced, this will need to be extended
+  cat <<EOF >$DIR/workspace/ansible_vars.yml
 kernel_settings_sysctl:
   - name: vm.nr_hugepages
     value: $NR_HUGEPAGES
@@ -111,15 +98,45 @@ project_namespace: "$PROJECT_NAMESPACE"
 run_fio: $RUN_FIO
 EOF
 
-#Install prerequisite roles and collections
-ansible-galaxy collection install --force-with-deps -p ./collections community.kubernetes
-ansible-galaxy role install --force-with-deps -p ./roles linux-system-roles.kernel_settings
+  #Install prerequisite roles and collections
+  ansible-galaxy collection install --force-with-deps -p ./collections community.kubernetes
+  ansible-galaxy role install --force-with-deps -p ./roles linux-system-roles.kernel_settings
 
-ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
+  ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
+}
 
-### Mayastor deployment
-ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" mayastor.yml
-cd $DIR
+secs_to_human() {
+    echo "$(( ${1} / 3600 ))h $(( (${1} / 60) % 60 ))m $(( ${1} % 60 ))s"
+}
+STARTTIME=$(date +%s)
+DIR=${PWD}
+if [ ! -d workspace ]; then mkdir workspace; fi
+source $DIR/vars
+
+for s in $STAGES; do
+  if [[ "$s" == "prov" ]]; then
+    provisioning
+    break
+  fi
+done
+
+start_vpn
+
+for s in $STAGES; do
+  if [[ "$s" == "k8s" ]]; then
+    $K8S_INSTALLER
+    break
+  fi
+done
+
+get_kubeconfig
+prep_nodes
+
+for p in $PLAYBOOKS; do
+  cd $DIR/deployments
+  ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" $p
+done
+
 
 ENDTIME=$(date +%s)
 RUNTIME=$(($ENDTIME - $STARTTIME))

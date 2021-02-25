@@ -1,13 +1,24 @@
 # General variables
 SETUP_NAME="maya-demo"
 
+# STAGES defines which stages in the deployment process will be performed. The available stages are "prov, k8s, node-prep
+# If a stage is skipped, an inventory.ini containing a bastion host and the following groups is expected in the workspace directory:
+# kube-master, etcd (only required for kubespray), kube-node (all workers), k8s-cluster:clildren (containing kube-master and kube-node),
+# workers (non-storage workers), mayastor (storage exporting workers)
+STAGES="prov k8s prep_nodes"
+
+# PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
+PLAYBOOKS="mayastor.yml "
+
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
 SSH_USER="centos"
 SSH_KEY=~/.ssh/id_rsa
 SSH_PUBKEY=~/.ssh/id_rsa.pub
 
-# Kubespray release
+
+# Kubernetes installer to use. Options are kubespray, kubeadm, more to be added
+K8S_INSTALLER="kubespray"
 KSPRAY_RELEASE="release-2.15"
 
 # Provisioning variables
@@ -48,7 +59,7 @@ STORAGE_NODES='{
     count = 3
     type = "m5ad.2xlarge"
     os_disk_size = 40
-    msp = "/dev/nvme0n1"
+    msp = "/dev/nvme1n1"
     }'
 MASTER_NODES='{
     count = 1

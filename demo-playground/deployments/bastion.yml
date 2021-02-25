@@ -1,0 +1,36 @@
+- name: configure sshuttle bastion host
+  become: true
+  hosts: bastion
+  gather_facts: false
+  tasks:
+    - name: Wait for bastion to be available
+      wait_for:
+        port: 22
+        host: "{{ hostvars['bastion'].ansible_host }}"
+        timeout: 600
+      delegate_to: localhost
+      become: false
+
+    - name: ensure python3 is installed
+      package:
+        name: python3
+        state: present
+
+    - name: adjust MaxSessions
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^MaxSessions'
+        line: 'MaxSessions 50'
+        state: present
+
+    - name: adjust MaxStartups
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^MaxStartups'
+        line: 'MaxStartups 50:30:80'
+        state: present
+
+    - name: restart sshd
+      service:
+        name: sshd
+        state: restarted
