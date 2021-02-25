@@ -1,0 +1,105 @@
+# Uses the default 'openebs-hostpath' localpv storage class to back the MinIO PVCs
+- name: Install the MinIO k8s operator onto the master nodes (will install all necessary dependencies like kubectl, pip, helm, krew, etc. on the master nodes so that nothing gets installed on localhost)
+  hosts: kube-master
+  vars:
+    KUBECONFIG_PATH: "/etc/kubernetes/admin.conf"
+    minio_tenants: # each MinIO tenant represents an independent object store deployed within the cluster 
+      - name: main
+        num_servers: 2
+        num_volumes: 4
+        capacity: 5Gi
+        namespace: default
+        storage-class: openebs-hostpath
+#  become: yes
+
+  tasks:
+    - name: Add the k8s repository to the yum package manager
+      yum_repository: 
+        name: kubernetes
+        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+        enabled: yes
+        description: "k8s repository"
+        gpgcheck: yes
+        repo_gpgcheck: yes
+        gpgkey: 
+          - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+          - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+    - name: Install kubectl from the k8s repository
+      yum:
+        name: kubectl
+        state: present
+      become_user: root
+
+    - name: Enable the EPEL CentOS repository (for installing pip)
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Install pip3 by installing python3 (for installing pyYAML)
+      yum: 
+        name: python3
+        state: present
+
+    # TODO replace this with the username in the ssh configuration
+    # - name: Alias pip3 as pip
+    #  shell: echo "alias 'pip=pip3'" >> ~/.bashrc
+    #  args:
+    #    executable: bash
+    #  become_user: maya-user
+
+    # TODO replace this with the username in the ssh configuration
+    - name: Install pyYAML (a requirement for the community.kubernetes.helm plugin)
+      shell: pip3 install PyYAML
+      args:
+        executable: bash 
+      become_user: maya-user
+
+      ## TODO REFRESH SNAP LIST BEFORE TRYING TO INSTALL HELM
+    
+    - name: Install helm (for installing OpenEBS)  
+      community.general.snap:
+        name: 
+          - helm
+        classic: yes 
+    
+    - name: Add OpenEBS helm chart repository to Helm repository list
+      community.kubernetes.helm_repository:
+        name: openebs-repo
+        repo_url: "https://openebs.github.io/charts"
+
+    - name: Create the openebs k8s namespace if not already present
+      k8s:
+        name: openebs
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: "{{ KUBECONFIG_PATH }}"
+
+    - name: Install the OpenEBS helm charts on the master
+      helm:
+        name: openebs
+        chart_ref: openebs-repo/openebs
+        update_repo_cache: yes
+        release_namespace: openebs
+
+    - name: Install the krew plugin (a kubectl add-on) 
+      include_role: 
+        name: cnygaard.kubectl_krew
+
+    - name: Install the MinIO k8's plugin with krew
+      shell: kubectl krew install minio
+      args:
+        executable: bash       
+
+    - name: Initialize the running MinIO plugin
+      shell: kubectl minio init
+      args:
+        executable: bash
+
+    - name: Create MinIO tenant
+      shell: kubectl minio tenant create --name {{item.name}} --servers {{item.num_servers}} --volumes {{item.volumes}} --capacity {{item.capacity}} --namespace {{item.namespace}} --storage-class {{item.storage-class}}
+      args:
+        executable: bash
+      with_items: "{{ minio_tenants }}"
+      
