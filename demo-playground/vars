@@ -1,11 +1,13 @@
 # General variables
 SETUP_NAME="maya-demo"
 
-# STAGES defines which stages in the deployment process will be performed. The available stages are "prov, k8s, node-prep
-# If a stage is skipped, an inventory.ini containing a bastion host and the following groups is expected in the workspace directory:
+# STAGES defines which stages in the deployment process will be performed. The available stages are "prov, start_vpn, k8s, prep_nodes
+STAGES="prov start_vpn k8s prep_nodes"
+
+# NOTE: If provisioning is skipped, an inventory.ini containing a bastion host and the following groups is expected in the workspace directory:
 # kube-master, etcd (only required for kubespray), kube-node (all workers), k8s-cluster:clildren (containing kube-master and kube-node),
 # workers (non-storage workers), mayastor (storage exporting workers)
-STAGES="prov k8s prep_nodes"
+# bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
 PLAYBOOKS="mayastor.yml "

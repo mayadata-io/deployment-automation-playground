@@ -49,7 +49,7 @@ function kubespray {
   cp -f $DIR/workspace/inventory.ini inventory/$SETUP_NAME/
 
   #Remove the bastion group, we don't want to confuse Kubespray
-  sed -i '/^bastion/d' inventory/$SETUP_NAME/inventory.ini
+  sed -i '/^bastion/d' inventory/$SETUP_NAME/inventory.ini || echo "no bastion found"
   sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
   sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
 
@@ -120,7 +120,12 @@ for s in $STAGES; do
   fi
 done
 
-start_vpn
+for s in $STAGES; do
+  if [[ "$s" == "start_vpn" ]]; then
+    start_vpn
+    break
+  fi
+done
 
 for s in $STAGES; do
   if [[ "$s" == "k8s" ]]; then
