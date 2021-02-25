@@ -60,12 +60,14 @@ function kubespray {
 function start_vpn { #Start VPN
   cd $DIR/deployments
   BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
-  ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
+  #ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
+  ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local bastion
   ansible-playbook -i $DIR/workspace/inventory.ini $DIR/deployments/bastion.yml
   pkill sshuttle || echo "sshuttle starting"
   nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
   # Wait for all nodes to come up and become available
-  ansible -m wait_for_connection -i $DIR/workspace/inventory.ini all
+  #ansible -m wait_for_connection --forks 1 -vvvv -i $DIR/workspace/inventory.ini all
+  ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
   cd $DIR
 }
 

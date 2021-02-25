@@ -8,18 +8,67 @@
         name: python3
         state: present
 
-    - name: adjust MaxSessions
-      lineinfile:
-        path: /etc/ssh/sshd_config
-        regexp: '^MaxSessions'
-        line: 'MaxSessions 50'
-        state: present
-
     - name: adjust MaxStartups
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^MaxStartups'
-        line: 'MaxStartups 50:30:80'
+        line: 'MaxStartups 100:60:160'
+        state: present
+
+    - name: Update PermitRootLogin
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+
+    - name: Update MaxSessions
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^MaxSessions'
+        line: 'MaxSessions 100'
+        state: present
+
+    - name: Update PasswordAuthentication
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+
+    - name: Update AllowAgentForwarding
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^AllowAgentForwarding'
+        line: 'AllowAgentForwarding yes'
+        state: present
+
+    - name: Update AllowTcpForwarding
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^AllowTcpForwarding'
+        line: 'AllowTcpForwarding yes'
+        state: present
+
+    - name: Update TCPKeepAlive
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^TCPKeepAlive'
+        line: 'TCPKeepAlive yes'
+        state: present
+
+    - name: Update ClientAliveInterval
+      lineinfile:
+        create: yes
+        path: /etc/ssh/sshd_config
+        regexp: '^ClientAliveInterval'
+        line: 'ClientAliveInterval 900'
         state: present
 
     - name: restart sshd
