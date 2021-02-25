@@ -1,105 +1,165 @@
-# Uses the default 'openebs-hostpath' localpv storage class to back the MinIO PVCs
 - name: Install the MinIO k8s operator onto the master nodes (will install all necessary dependencies like kubectl, pip, helm, krew, etc. on the master nodes so that nothing gets installed on localhost)
   hosts: kube-master
   vars:
     KUBECONFIG_PATH: "/etc/kubernetes/admin.conf"
-    minio_tenants: # each MinIO tenant represents an independent object store deployed within the cluster 
-      - name: main
-        num_servers: 2
-        num_volumes: 4
-        capacity: 5Gi
-        namespace: default
-        storage-class: openebs-hostpath
-#  become: yes
+    minio_tenants: # each tenant represents an independent object store deployed within the cluster 
+    - name: main
+      num_servers: 2
+      num_volumes: 4
+      capacity: 5Gi
+      namespace: default
+      storage-class: openebs-hostpath # use the default 'openebs-hostpath' localpv storage class to back the MinIO PVCs
 
   tasks:
-    - name: Add the k8s repository to the yum package manager
-      yum_repository: 
-        name: kubernetes
-        baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
-        enabled: yes
-        description: "k8s repository"
-        gpgcheck: yes
-        repo_gpgcheck: yes
-        gpgkey: 
-          - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
-          - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+  - name: Ensure that the kubeconfig file for the cluster can be found at $HOME/.kube/config
+    block:
+    - name: Ensure that the $HOME/.kube directory exists
+      ansible.builtin.file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0777
 
-    - name: Install kubectl from the k8s repository
-      yum:
-        name: kubectl
-        state: present
-      become_user: root
+    - name: Copy the kubeconfig from /etc/kubernetes to $HOME/.kube if it's not already there
+      copy: 
+        src: /etc/kubernetes/admin.conf 
+        dest: $HOME/.kube/config
+        remote_src: yes
+        force: yes
 
-    - name: Enable the EPEL CentOS repository (for installing pip)
-      yum:
-        name: epel-release
-        state: present
+    - name: Get the user and group ids of the current user, and then acquire ownership of the kubeconfig
+      block: 
+      - name: Obtain and store the user id of this user
+        command: id -u
+        register: REMOTE_HOST_USER_ID
 
-    - name: Install pip3 by installing python3 (for installing pyYAML)
+      - name: Obtain and store the group id of this user
+        command: id -u
+        command: REMOTE_HOST_GROUP_ID
+
+      - name: Give ownership of the kubeconfig to this user
+        ansible.builtin.file:
+          path: $HOME/.kube/config
+          user: {{ REMOTE_HOST_USER_ID }}
+          group: {{ REMOTE_HOST_GROUP_ID }}
+
+  - name: Add the k8s repository to the yum package manager
+    yum_repository: 
+      name: kubernetes
+      baseurl: https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+      enabled: yes
+      description: "k8s repository"
+      gpgcheck: yes
+      repo_gpgcheck: yes
+      gpgkey: 
+        - https://packages.cloud.google.com/yum/doc/yum-key.gpg 
+        - https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+  - name: Install kubectl from the k8s repository
+    yum:
+      name: kubectl
+      state: present
+
+  - name: Enable the EPEL CentOS repository (for installing pip)
+    yum:
+      name: epel-release
+      state: present
+
+  - name: Install pip3 by installing python3 (for installing pyYAML)
+    yum: 
+      name: python3
+      state: present
+
+  - name: Install pyyaml (a requirement for the community.kubernetes.helm plugin)
+    shell: pip3 install pyyaml
+    args:
+      executable: bash 
+
+    ## TODO REFRESH SNAP LIST BEFORE TRYING TO INSTALL HELM
+  - name: Install helm (for installing OpenEBS)  
+    community.general.snap:
+      name: 
+        - helm
+      classic: yes 
+    
+  - name: Add OpenEBS helm chart repository to Helm repository list
+    community.kubernetes.helm_repository:
+      name: openebs-repo
+      repo_url: "https://openebs.github.io/charts"
+
+  - name: Create the openebs k8s namespace if not already present
+    k8s:
+      name: openebs
+      api_version: v1
+      kind: Namespace
+      state: present
+      kubeconfig: "{{ KUBECONFIG_PATH }}"
+
+  - name: Install the OpenEBS helm charts on the master
+    helm:
+      name: openebs
+      chart_ref: openebs-repo/openebs
+      update_repo_cache: yes
+      release_namespace: openebs
+
+  - name: Install the 'krew' kubectl plugin
+    block:
+    - name: Ensure that git is installed
+      block: 
+      name: Ensure that git is installed
       yum: 
-        name: python3
+        name: git
         state: present
+      when: ansible_os_family = "CentOS"
 
-    # TODO replace this with the username in the ssh configuration
-    # - name: Alias pip3 as pip
-    #  shell: echo "alias 'pip=pip3'" >> ~/.bashrc
-    #  args:
-    #    executable: bash
-    #  become_user: maya-user
-
-    # TODO replace this with the username in the ssh configuration
-    - name: Install pyYAML (a requirement for the community.kubernetes.helm plugin)
-      shell: pip3 install PyYAML
-      args:
-        executable: bash 
-      become_user: maya-user
-
-      ## TODO REFRESH SNAP LIST BEFORE TRYING TO INSTALL HELM
-    
-    - name: Install helm (for installing OpenEBS)  
-      community.general.snap:
-        name: 
-          - helm
-        classic: yes 
-    
-    - name: Add OpenEBS helm chart repository to Helm repository list
-      community.kubernetes.helm_repository:
-        name: openebs-repo
-        repo_url: "https://openebs.github.io/charts"
-
-    - name: Create the openebs k8s namespace if not already present
-      k8s:
-        name: openebs
-        api_version: v1
-        kind: Namespace
+      name: Ensure that git is installed
+      apt:
+        name: git
         state: present
-        kubeconfig: "{{ KUBECONFIG_PATH }}"
+      when: ansible_os_family = "Ubuntu"
 
-    - name: Install the OpenEBS helm charts on the master
-      helm:
-        name: openebs
-        chart_ref: openebs-repo/openebs
-        update_repo_cache: yes
-        release_namespace: openebs
+    - name: Create a temporary directory to store installation files
+      ansible.builin.tempfile:
+        state: directory
+        suffix: temp
+      register: tempdir_1
+    
+    - name: Download the .tar.gz of the krew installation script 
+      ansible.builtin.get_url:            
+        url: https://github.com/kubernetes-sigs/krew/releases/latest/download/krew.tar.gz
+        dest: {{ tempdir_1.path }}/krew_archive
 
-    - name: Install the krew plugin (a kubectl add-on) 
-      include_role: 
-        name: cnygaard.kubectl_krew
+    - name: Extract the installation script from the .tar.gz
+      ansible.builtin.unarchive: {{ tempdir_1.path }}/krew_archive
+        src: {{ tempdir_1.path }}/krew_archive
+        dest: {{ tempdir_1 }}
 
-    - name: Install the MinIO k8's plugin with krew
-      shell: kubectl krew install minio
-      args:
-        executable: bash       
+    - name: Perform the necessary transformations on the $OS and $ARCH variables before feeding them into the isntallation script
+      block:
+      - set_fact:
+        "{{ OS }}" : "{{ ansible_os_family | lower }}"
+      - set_fact:
+        "{{ ARCH }}" : "{{ ansible_archtecture | regex_replace('x86_64', 'amd64') | regex_replace('\(arm\)\(64\)?.*','\1\2') | regex_replace('aarch64$', 'arm64') }}"
 
-    - name: Initialize the running MinIO plugin
-      shell: kubectl minio init
-      args:
+    - name: Run the installation script
+      command: cd {{tempdir_1.path}} && ./krew-{{ OS }}_{{ ARCH }} install krew
+      args: 
         executable: bash
 
-    - name: Create MinIO tenant
-      shell: kubectl minio tenant create --name {{item.name}} --servers {{item.num_servers}} --volumes {{item.volumes}} --capacity {{item.capacity}} --namespace {{item.namespace}} --storage-class {{item.storage-class}}
-      args:
-        executable: bash
-      with_items: "{{ minio_tenants }}"
-      
+    - name: Remove the temporary directory
+      ansible.builtin.file:
+        path: "{{ tempdir_1.path }}"
+        state: absent
+        force: yes
+      when: tempdir_1.path is defined
+
+  - name: Initialize the MinIO plugin
+    shell: kubectl minio init
+    args:
+      executable: bash
+
+  - name: Create the MinIO tenants
+    shell: kubectl minio tenant create --name {{item.name}} --servers {{item.num_servers}} --volumes {{item.volumes}} --capacity {{item.capacity}} --namespace {{item.namespace}} --storage-class {{item.storage-class}}
+    args:
+      executable: bash
+    with_items: "{{ minio_tenants }}"
+    
