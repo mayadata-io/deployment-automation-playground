@@ -1,6 +1,4 @@
 #!/bin/bash
-set -ex -o pipefail
-
 # required packages:
 # - ansible 2.9.17
 # - pip3
@@ -8,6 +6,7 @@ set -ex -o pipefail
 ### PROVISIONING
 function provisioning
 {
+  echo Provisioning VMs on $PLATFORM
   cd $DIR/prov/$PLATFORM
 
     #Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
@@ -31,7 +30,7 @@ EOF
 }
 
 function kubespray {
-### K8S deployment
+  echo "Installing Kubespray $KSPRAY_RELEASE"
   cd $DIR
   if [ -d kubespray ]; then
     cd kubespray
@@ -64,6 +63,7 @@ function kubespray {
 }
 
 function k3s {
+  echo "Installing K3S"
   cd $DIR
   if [ -d k3s-ansible ]; then
     cd k3s-ansible
@@ -87,8 +87,10 @@ function k3s {
 }
 
 function start_vpn { #Start VPN
+
   cd $DIR/deployments
   BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
+  echo "Setting up sshuttle VPN connection through $BASTION"
   #ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local bastion
   ansible-playbook -i $DIR/workspace/inventory.ini $DIR/deployments/bastion.yml
@@ -102,6 +104,7 @@ function start_vpn { #Start VPN
 
 ### PREPARE NODES
 function prep_nodes {
+  echo "Running node_prep"
   cd $DIR/deployments
   cp -f $DIR/workspace/ssh.cfg .
 
@@ -139,6 +142,12 @@ STARTTIME=$(date +%s)
 DIR=${PWD}
 if [ ! -d workspace ]; then mkdir workspace; fi
 source $DIR/vars
+if [ $DEBUG_OUTPUT == "true" ]; then
+  set -ex -o pipefail
+else
+  set -e -o pipefail
+fi
+
 
 for s in $STAGES; do
   if [[ "$s" == "prov" ]]; then
