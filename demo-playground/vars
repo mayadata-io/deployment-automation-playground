@@ -19,8 +19,9 @@ SSH_KEY=~/.ssh/id_rsa
 SSH_PUBKEY=~/.ssh/id_rsa.pub
 
 
-# Kubernetes installer to use. Options are kubespray, kubeadm, more to be added
-K8S_INSTALLER="kubespray"
+# Kubernetes installer to use. Options are kubespray, k3s, more to be added
+#K8S_INSTALLER="kubespray"
+K8S_INSTALLER="k3s"
 KSPRAY_RELEASE="release-2.15"
 
 # Provisioning variables

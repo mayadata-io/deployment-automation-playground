@@ -72,11 +72,20 @@
         state: present
       loop: "{{ kmods }}"
 
+    - name: Populate service facts
+      service_facts:
+
     - name: restart kubelet
       service:
         name: kubelet
         state: restarted
+      when: ansible_facts.services["kubelet.service"] is defined
 
+    - name: restart k3s-node
+      service:
+        name: k3s-node
+        state: restarted
+      when: ansible_facts.services["k3s-node.service"] is defined
 
   roles:
     - linux-system-roles.kernel_settings

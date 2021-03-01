@@ -55,6 +55,35 @@ function kubespray {
 
   # Deploy Kubespray
   ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root cluster.yml
+
+  # Pull out kubeconfig
+  cd $DIR/workspace
+  sleep 5
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat /etc/kubernetes/admin.conf" > admin.conf
+  export KUBECONFIG="$DIR/workspace/admin.conf"
+}
+
+function k3s {
+  cd $DIR
+  if [ -d k3s-ansible ]; then
+    cd k3s-ansible
+  else
+    git clone https://github.com/k3s-io/k3s-ansible.git
+    cd k3s-ansible
+  fi
+  git checkout master
+  pip3 install ansible==2.9.17
+
+  cp -rfp inventory/sample inventory/$SETUP_NAME
+  cp -f $DIR/workspace/inventory.ini inventory/$SETUP_NAME/
+
+  ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root site.yml
+
+  # Pull out kubeconfig
+  cd $DIR/workspace
+  sleep 5
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat ~/.kube/config" > admin.conf
+  export KUBECONFIG="$DIR/workspace/admin.conf"
 }
 
 function start_vpn { #Start VPN
@@ -69,13 +98,6 @@ function start_vpn { #Start VPN
   #ansible -m wait_for_connection --forks 1 -vvvv -i $DIR/workspace/inventory.ini all
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
   cd $DIR
-}
-
-function get_kubeconfig { ### EXTRACT KUBECONFIG
-  cd $DIR/workspace
-  sleep 5
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat /etc/kubernetes/admin.conf" > admin.conf
-  export KUBECONFIG="$DIR/workspace/admin.conf"
 }
 
 ### PREPARE NODES
@@ -136,7 +158,10 @@ for s in $STAGES; do
   fi
 done
 
-get_kubeconfig
+if [ ! -f $DIR/workspace/admin.conf ]; then
+  echo "Missing admin.conf, please download it from the K8S master node, usually under /etc/kubernetes or a user's ~/.kube/config"
+  exit 1
+fi
 prep_nodes
 
 for p in $PLAYBOOKS; do
