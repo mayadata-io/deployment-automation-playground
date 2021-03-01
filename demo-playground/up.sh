@@ -35,12 +35,12 @@ function kubespray {
   cd $DIR
   if [ -d kubespray ]; then
     cd kubespray
-    git pull
   else
     git clone https://github.com/kubernetes-sigs/kubespray.git
     cd kubespray
   fi
   git checkout "$KSPRAY_RELEASE"
+  pip3 install ansible==2.9.17
   pip3 install -r requirements.txt
   pip3 install openshift
   #TODO: move to virtualenv
