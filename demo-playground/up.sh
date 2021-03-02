@@ -9,8 +9,13 @@ function provisioning
   echo Provisioning VMs on $PLATFORM
   cd $DIR/prov/$PLATFORM
 
-    #Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
+  if [[ ! "$STAGES" == *" k8s "* ]]; then  # If k8s is not in the STAGES list
+    K8S_INSTALLER="None"
+  fi
+
+  #Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
   cat <<EOF >$DIR/workspace/prov.tfvars
+k8s_installer = "$K8S_INSTALLER"
 setup_name = "$SETUP_NAME"
 location = "$LOCATION"
 ssh_user = "$SSH_USER"
@@ -74,10 +79,16 @@ function k3s {
   git checkout master
   pip3 install ansible==2.9.17
 
-  cp -rfp inventory/sample inventory/$SETUP_NAME
-  cp -f $DIR/workspace/inventory.ini inventory/$SETUP_NAME/
+  cat <<EOF > $DIR/workspace/k3s_vars.yml
+k3s_version: $K3S_VERSION
+ansible_user: $SSH_USER
+systemd_dir: /etc/systemd/system
+master_ip: "{{ hostvars[groups['master'][0]]['ansible_host'] | default(groups['master'][0]) }}"
+extra_server_args: ""
+extra_agent_args: "--node-name={{ inventory_hostname }}"
+EOF
 
-  ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root site.yml
+  ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/k3s_vars.yml" site.yml
 
   # Pull out kubeconfig
   cd $DIR/workspace
@@ -97,7 +108,6 @@ function start_vpn { #Start VPN
   pkill sshuttle || echo "sshuttle starting"
   nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
   # Wait for all nodes to come up and become available
-  #ansible -m wait_for_connection --forks 1 -vvvv -i $DIR/workspace/inventory.ini all
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
   cd $DIR
 }

@@ -23,7 +23,8 @@ SSH_PUBKEY=~/.ssh/id_rsa.pub
 # Kubernetes installer to use. Options are kubespray, k3s, more to be added
 #K8S_INSTALLER="kubespray"
 K8S_INSTALLER="k3s"
-KSPRAY_RELEASE="release-2.15"
+KSPRAY_RELEASE="release-2.15"   # Kubespray version (git branch)
+K3S_VERSION="v1.20.4+k3s1"      # K3S version
 
 # Provisioning variables
 # Platform specific vars are expected here, formatting for variables follows the terraform convention

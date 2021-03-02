@@ -10,6 +10,11 @@ variable "location" {
   default = "eastus"
 }
 
+variable "k8s_installer" {
+  type = string
+  default = "None"
+}
+
 # find other images with az vm image list --all --publisher OpenLogic --offer CentOS
 variable "image" {
   description = "Image details for the cluster nodes"
