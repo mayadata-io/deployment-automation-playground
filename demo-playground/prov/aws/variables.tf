@@ -24,7 +24,12 @@ variable "image" {
   }
 }
 #ssh connection vars
-#ssh username is default in the AMI, we will user image.user
+#ssh username is default in the AMI, we will use image.user
+variable "ssh_user" {
+  type = string
+  default = "user"
+}
+
 variable "ssh_private_key" {
   description = "The private key to use when connecting to the instances."
   type        = string

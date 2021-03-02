@@ -1,6 +1,6 @@
 # General variables
 SETUP_NAME="maya-demo"
-DEBUG_OUTPUT=false
+DEBUG_OUTPUT="true"
 
 # STAGES defines which stages in the deployment process will be performed. The available stages are "prov, start_vpn, k8s, prep_nodes
 STAGES="prov start_vpn k8s prep_nodes"

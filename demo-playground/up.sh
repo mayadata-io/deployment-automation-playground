@@ -142,7 +142,7 @@ STARTTIME=$(date +%s)
 DIR=${PWD}
 if [ ! -d workspace ]; then mkdir workspace; fi
 source $DIR/vars
-if [ $DEBUG_OUTPUT == "true" ]; then
+if [[ "$DEBUG_OUTPUT" == "true" ]]; then
   set -ex -o pipefail
 else
   set -e -o pipefail
@@ -167,10 +167,11 @@ for s in $STAGES; do
   fi
 done
 
-if [ ! -f $DIR/workspace/admin.conf ]; then
-  echo "Missing admin.conf, please download it from the K8S master node, usually under /etc/kubernetes or a user's ~/.kube/config"
-  exit 1
-fi
+# if [ ! -f $DIR/workspace/admin.conf ]; then
+#   echo "Missing admin.conf, please download it from the K8S master node, usually under /etc/kubernetes or a user's ~/.kube/config"
+#   exit 1
+# fi
+
 prep_nodes
 
 for p in $PLAYBOOKS; do
