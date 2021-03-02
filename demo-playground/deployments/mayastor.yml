@@ -40,7 +40,7 @@
             name: "{{ item }}"
             labels:
               openebs.io/engine: "mayastor"
-      with_inventory_hostnames: mayastor
+      with_inventory_hostnames: mayastor_storage
 
     - name: create mayastor namespace
       k8s:
@@ -124,7 +124,7 @@
           namespace: mayastor
           name: mayastor-csi
         register: kubectl_get_dset_csi
-        until: kubectl_get_dset_csi['resources'][0]['status']['numberReady'] == groups['kube-node']|count
+        until: kubectl_get_dset_csi['resources'][0]['status']['numberReady'] >= (groups['mayastor_clients']|count + groups['mayastor_storage']|count)
         retries: 50
 
     - name: Control Plane
@@ -192,7 +192,7 @@
           namespace: mayastor
           name: mayastor
         register: kubectl_get_dset_mayastor
-        until: kubectl_get_dset_mayastor['resources'][0]['status']['numberReady'] == groups['mayastor']|count
+        until: kubectl_get_dset_mayastor['resources'][0]['status']['numberReady'] == groups['mayastor_storage']|count
         retries: 50
 
       - name: get list of MSNs and compare to mayastor nodes in inventory (count only)
@@ -202,7 +202,7 @@
           namespace: mayastor
           kind: MayastorNode
         register: get_msn
-        until: get_msn['resources']|count == groups['mayastor']|count
+        until: get_msn['resources']|count == groups['mayastor_storage']|count
 
     - name: Create Mayastor pool definitions
       block:
@@ -210,7 +210,7 @@
           template:
             src: templates/msp.yaml.j2
             dest: "{{ DIR }}/workspace/msp-{{ item }}.yaml"
-          with_inventory_hostnames: mayastor
+          with_inventory_hostnames: mayastor_storage
           vars:
             msp: "{{ hostvars[item].msp_disk }}"
             node_name: "{{ item }}"
@@ -220,7 +220,7 @@
             state: present
             kubeconfig: "{{ DIR }}/workspace/admin.conf"
             src: "{{ DIR }}/workspace/msp-{{ item }}.yaml"
-          with_inventory_hostnames: mayastor
+          with_inventory_hostnames: mayastor_storage
 
     - name: Create Mayastor StorageClass
       block:
@@ -229,7 +229,7 @@
             src: templates/storageclass.yaml.j2
             dest: "{{ DIR }}/workspace/storageclass.yaml"
           vars:
-            replicas: "{{ replica_count|default(groups['mayastor']|count) }}"
+            replicas: "{{ replica_count|default(groups['mayastor_storage']|count) }}"
             protocol: "{{ storage_protocol }}"
 
         - name: create storageClass

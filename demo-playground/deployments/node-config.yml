@@ -1,6 +1,6 @@
 ---
-- name: Mayastor node configuration - workers and storage nodes
-  hosts: workers, mayastor
+- name: Mayastor node configuration - clients and storage nodes
+  hosts: mayastor_storage,mayastor_clients
   become: true
 
   vars:
