@@ -177,11 +177,6 @@ for s in $STAGES; do
   fi
 done
 
-# if [ ! -f $DIR/workspace/admin.conf ]; then
-#   echo "Missing admin.conf, please download it from the K8S master node, usually under /etc/kubernetes or a user's ~/.kube/config"
-#   exit 1
-# fi
-
 prep_nodes
 
 for p in $PLAYBOOKS; do
