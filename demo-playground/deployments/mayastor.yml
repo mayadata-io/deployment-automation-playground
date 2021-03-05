@@ -1,7 +1,7 @@
 - name: Install Mayastor modules
   hosts: localhost
   vars:
-    DIR: "../workspace/admin.conf"
+    DIR: "../workspace/"
     limits:
       cpu: "6"
       memory: "1024Mi"
@@ -273,15 +273,17 @@
 
         - name: save the volume name
           set_fact:
-            pv_name: _pvc['resources'][0]['spec']['volumeName']
+            pv_name: "{{ _pvc['resources'][0]['spec']['volumeName'] }}"
 
     - name: deploy FIO pod and run a benchmark
       block:
-        - name: download fio.yaml
-          get_url:
-            url: "https://raw.githubusercontent.com/openebs/Mayastor/master/deploy/fio.yaml"
+        - name: Create fio.yaml
+          template:
+            src: templates/fio.yaml.j2
             dest: "{{ DIR }}/workspace/fio.yaml"
-            mode: 0644
+          vars:
+            fio_volume_name: "{{ pv_name }}"
+            fio_pvc_name: "{{ pvc[0].name }}"
 
         - name: apply fio.yaml
           k8s:
@@ -295,7 +297,7 @@
             kubeconfig: "{{ DIR }}/workspace/admin.conf"
             kind: Pod
             namespace: "{{ project_namespace|default('default') }}"
-            name: "fio"
+            name: "mayastor-fio"
           register: kubectl_get_pod_fio
           until: kubectl_get_pod_fio['resources'][0]['status']['phase'] == "Running"
           retries: 50
@@ -305,6 +307,13 @@
             export KUBECONFIG="{{ DIR }}/workspace/admin.conf"
             kubectl exec -it fio -- fio --name=benchtest --size=800m --filename=/volume/test --direct=1 --rw=randrw --ioengine=libaio --bs=4k --iodepth=16 --numjobs=8 --time_based --runtime=60
           register: bench_out
+
+        - name: delete mayastor-fio pod
+          k8s:
+            state: absent
+            namespace: "{{ project_namespace|default('default') }}"
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/fio.yaml"
 
         - name: print out benchmark results
           debug:

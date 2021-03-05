@@ -23,34 +23,40 @@
       - nvme-tcp
       - nvmet
 
+    #iscsid is optional if nvmf mode or localPV mode are in use
+    enable_iscsi: true
+
   tasks:
-    - name: install RPM packages
-      yum:
-        name: "{{ rpm_prerequisites }}"
-        state: present
-      when: ansible_os_family == "RedHat"
-
-    - name: install DEB packages
+    - name: Install and enable iSCSI
       block:
-        - name: Upgrade all packages to the latest version
-          apt:
-            name: "*"
-            state: latest
-            force_apt_get: yes
-            update_cache: yes
-
-        - name: Install DEB packages
-          apt:
-            name: "{{ deb_prerequisites }}"
+        - name: install RPM packages
+          yum:
+            name: "{{ rpm_prerequisites }}"
             state: present
-            force_apt_get: yes
-      when: ansible_os_family == "Debian"
+          when: ansible_os_family == "RedHat"
 
-    - name: enable and start the iscsid service
-      service:
-        name: iscsid
-        enabled: yes
-        state: started
+        - name: install DEB packages
+          block:
+            - name: Upgrade all packages to the latest version
+              apt:
+                name: "*"
+                state: latest
+                force_apt_get: yes
+                update_cache: yes
+
+            - name: Install DEB packages
+              apt:
+                name: "{{ deb_prerequisites }}"
+                state: present
+                force_apt_get: yes
+          when: ansible_os_family == "Debian"
+
+        - name: enable and start the iscsid service
+          service:
+            name: iscsid
+            enabled: yes
+            state: started
+      when: enable_iscsi|bool
 
     - name: create config file for nvme-multipath
       lineinfile:

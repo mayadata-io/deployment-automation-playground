@@ -1,0 +1,22 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: mayastor-fio
+spec:
+  volumes:
+    - name: mayastor-fio-volume
+      persistentVolumeClaim:
+        claimName: {{ fio_pvc_name }}
+  containers:
+    - name: fio
+      image: nixery.dev/shell/fio/tini
+      command: [ "tini", "--" ]
+      args:
+        - sleep
+        - "1000000"
+      volumeMounts:
+        - mountPath: "/volume"
+          name: mayastor-fio-volume
+      #volumeDevices:
+      #  - devicePath: /dev/xvda
+      #    name: ms-volume

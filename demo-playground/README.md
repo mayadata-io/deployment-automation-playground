@@ -116,6 +116,42 @@ maya-demo-storage-2
 
 In case K8S install stage is skipped (using GKE, or already running your own K8S for example) we will need to add the kubeconfig credentials file as `workspace/admin.conf`
 
+## Available playbooks:
+
+Some playbooks are used for all deployments and are excluded from this list:
+- bastion.yml - prepares the bastion host for better ssh throughput
+- node-config.yml - installs and configures the prerequisites for Mayastor on the storage and worker nodes
+#### mayastor.yml
+The playbook will install Mayastor, create the PVCs and optionally deploy an FIO testing pod and run a quick benchmark test
+
+Variables (see the `vars` file - these are all represented there):
+```yaml
+#CPU and memory limits applied to the mayastor pods
+limits:
+    cpu: "6"
+    memory: "1024Mi"
+    hugepages2Mi: "2Gi"
+
+#per mayastor spec, can be "nvmf" or "iscsi"
+storage_protocol: "nvmf"
+
+    #if no replica_count is defined, it defaults to the number of mayastor nodes
+replica_count: 3
+
+#create the following PVCs
+pvc:
+    - name: pvc1
+    size: 50Gi
+    - name: pvc2
+    size: 20Gi
+    - name: pvc3
+    size: 100Gi
+
+#deploy the FIO pod and run a benchmark
+run_fio: true
+```
+
+
 ## Extending this framework
 
 - Additional plays can be added to the `deployments` directory, and optionally added to `vars` in the `PLAYBOOKS` variable.

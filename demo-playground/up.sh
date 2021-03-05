@@ -105,8 +105,14 @@ function start_vpn { #Start VPN
   #ansible -m wait_for_connection -i $DIR/workspace/inventory.ini bastion
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local bastion
   ansible-playbook -i $DIR/workspace/inventory.ini $DIR/deployments/bastion.yml
-  pkill sshuttle || echo "sshuttle starting"
-  nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
+  cat <<EOF > $DIR/workspace/start_vpn.sh
+#!/bin/bash
+set -e
+pkill sshuttle || echo "sshuttle starting"
+nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
+EOF
+  chmod +x $DIR/workspace/start_vpn.sh
+  $DIR/workspace/start_vpn.sh
   # Wait for all nodes to come up and become available
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
   cd $DIR
@@ -136,6 +142,7 @@ replica_count: $REPLICA_COUNT
 pvc: $PVC
 project_namespace: "$PROJECT_NAMESPACE"
 run_fio: $RUN_FIO
+enable_iscsi: $ENABLE_ISCSI
 EOF
 
   #Install prerequisite roles and collections
@@ -178,6 +185,12 @@ for s in $STAGES; do
 done
 
 prep_nodes
+
+for s in $STAGES; do
+  if [[ "$s" == "start_vpn" ]]; then
+    start_vpn
+  fi
+done
 
 for p in $PLAYBOOKS; do
   cd $DIR/deployments

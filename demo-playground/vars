@@ -1,5 +1,5 @@
 # General variables
-SETUP_NAME="maya-demo"
+SETUP_NAME="dyasny-maya-demo"
 DEBUG_OUTPUT="true"
 
 # STAGES defines which stages in the deployment process will be performed. The available stages are "prov, start_vpn, k8s, prep_nodes
@@ -87,7 +87,8 @@ HUGEPAGES_2MI="2Gi"
 STORAGE_PROTOCOL="nvmf"
 REPLICA_COUNT=3
 PROJECT_NAMESPACE="default"
-RUN_FIO="false"
+ENABLE_ISCSI="false"
+RUN_FIO="true"
 
 #List of PVC dicts containing name:size
 PVC='[{"name":"pvc1","size":"100Gi"},{"name":"pvc2","size":"200Gi"},{"name":"pvc3","size":"300Gi"}]'
