@@ -15,7 +15,7 @@ PLAYBOOKS="mayastor.yml "
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
-SSH_USER="centos"
+SSH_USER="ubuntu"
 SSH_KEY=~/.ssh/id_rsa
 SSH_PUBKEY=~/.ssh/id_rsa.pub
 
@@ -56,10 +56,14 @@ K3S_VERSION="v1.20.4+k3s1"      # K3S version
 
 PLATFORM="aws"
 LOCATION="us-east-1"
+#S_IMAGE='{
+#  ami_id = "ami-0d6e9a57f6259ba3a"
+#  user   = "centos"
+#  }'
 OS_IMAGE='{
-    ami_id = "ami-0d6e9a57f6259ba3a"
-    user   = "centos"
-    }'
+    ami_id = "ami-042e8287309f5df03"
+    user   = "ubuntu"
+}'
 STORAGE_NODES='{
     count = 3
     type = "m5ad.2xlarge"

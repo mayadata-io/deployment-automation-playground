@@ -126,12 +126,7 @@ function prep_nodes {
 
   #Create the vars file, if more variables are introduced, this will need to be extended
   cat <<EOF >$DIR/workspace/ansible_vars.yml
-kernel_settings_sysctl:
-  - name: vm.nr_hugepages
-    value: $NR_HUGEPAGES
-kernel_settings_sysfs:
-  - name: /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-    value: $NR_HUGEPAGES
+nr_hugepages: $NR_HUGEPAGES
 DIR: "$DIR"
 limits:
   cpu: "$CPU_LIMIT"

@@ -4,13 +4,7 @@
   become: true
 
   vars:
-    kernel_settings_sysctl:
-      - name: vm.nr_hugepages
-        value: 1024
-    kernel_settings_sysfs:
-      - name: /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-        value: 1024
-
+    nr_hugapages: 512
     # Add required package names below
     deb_prerequisites:
       - open-iscsi
@@ -27,6 +21,19 @@
     enable_iscsi: true
 
   tasks:
+    - name: Set up hugepages
+      shell: |
+        echo "{{ nr_hugepages }}" | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+        echo vm.nr_hugepages = "{{ nr_hugepages }}" | sudo tee -a /etc/sysctl.conf
+
+    - name: Upgrade all packages to the latest version
+      apt:
+        name: "*"
+        state: latest
+        force_apt_get: yes
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
     - name: Install and enable iSCSI
       block:
         - name: install RPM packages
@@ -37,13 +44,6 @@
 
         - name: install DEB packages
           block:
-            - name: Upgrade all packages to the latest version
-              apt:
-                name: "*"
-                state: latest
-                force_apt_get: yes
-                update_cache: yes
-
             - name: Install DEB packages
               apt:
                 name: "{{ deb_prerequisites }}"
@@ -58,6 +58,27 @@
             state: started
       when: enable_iscsi|bool
 
+    - name: install linux-modules-extra-$(uname -r)
+      block:
+        - name: get kernel version
+          shell: |
+            uname -r
+          register: kernel_version
+
+        - name: Install kernel modules extra
+          apt:
+            name: "linux-modules-extra-{{ kernel_version.stdout }}"
+            state: present
+            force_apt_get: yes
+
+        - name: persist nvme modules across reboots (DEB)
+          lineinfile:
+            path: "/etc/modules"
+            line: "{{ item }}"
+            state: present
+          with_items: "{{ kmods }}"
+      when: ansible_os_family == "Debian"
+
     - name: create config file for nvme-multipath
       lineinfile:
         path: /etc/modprobe.d/nvme-multipath
@@ -67,16 +88,25 @@
       register: nvme_mp_created
       when: ansible_os_family == "RedHat"
 
-    - name: Reboot (because kmod reload doesn't usually work)
-      reboot:
-        reboot_timeout: 3600
-      when: nvme_mp_created.changed
-
     - name: load the NVMe kmods
       modprobe:
         name: "{{ item }}"
         state: present
       loop: "{{ kmods }}"
+
+    - name: persist nvme modules across reboots (RHEL)
+      lineinfile:
+        path: " /etc/modules-load.d/mayastor-nvme.conf"
+        line: "{{ item }}"
+        state: present
+        create: yes
+      with_items: "{{ kmods }}"
+      when: ansible_os_family == "RedHat"
+
+    - name: Reboot (because kmod reload doesn't usually work)
+      reboot:
+        reboot_timeout: 3600
+      when: nvme_mp_created.changed
 
     - name: Populate service facts
       service_facts:
@@ -92,18 +122,3 @@
         name: k3s-node
         state: restarted
       when: ansible_facts.services["k3s-node.service"] is defined
-
-  roles:
-    - linux-system-roles.kernel_settings
-
-
-
-
-
-
-
-
-
-
-
-
