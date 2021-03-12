@@ -2,6 +2,9 @@
 # required packages:
 # - ansible 2.9.17
 # - pip3
+# - kubectl
+# - helm
+# - helm-diff (helm plugin install https://github.com/databus23/helm-diff)
 
 ### PROVISIONING
 function provisioning
@@ -109,8 +112,9 @@ function start_vpn { #Start VPN
 #!/bin/bash
 set -e
 pkill sshuttle || echo "sshuttle starting"
-nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.1.0/24 &
+nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.0.0/8 &
 EOF
+  #TODO: 10.0.0.0/8 could be smarter, but since we want to cover both 10.0.1.0/24 and the SDN, this will do for now
   chmod +x $DIR/workspace/start_vpn.sh
   $DIR/workspace/start_vpn.sh
   # Wait for all nodes to come up and become available

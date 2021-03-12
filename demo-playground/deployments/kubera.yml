@@ -1,0 +1,36 @@
+- name: Install Mayastor modules
+  hosts: localhost
+  vars:
+    DIR: "../workspace/"
+    #set the required namespace here, if not set, will default to "default"
+    #project_namespace: myproject
+
+  tasks:
+  - name: Add kubera chart repo
+    community.kubernetes.helm_repository:
+      name: kubera
+      repo_url: "https://charts.mayadata.io/"
+
+  - name: Deploy Kubera Helm chart
+    community.kubernetes.helm:
+      kubeconfig: "{{ DIR }}/workspace/admin.conf"
+      name: kubera
+      chart_ref: kubera/kubera-enterprise-ci
+      release_namespace: "{{ project_namespace|default('kubera') }}"
+      create_namespace: true
+      wait: true
+
+  # - name: Wait for pods to come up
+  #   shell: |
+  #     kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" get pods -n "{{ project_namespace|default('kubera') }}" -o wide|grep kubera-ingress-nginx-controller
+  #   register: kubera_ingress_pod_status
+  #   until: kubera_ingress_pod_status.stdout.split()|count > 0 and kubera_ingress_pod_status.stdout.split()[2] == "Running"
+
+  - name: Get service IP for access
+    shell: |
+      kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" get svc -n "{{ project_namespace|default('kubera') }}"|grep kubera-ingress-nginx-controller|grep NodePort
+    register: kubera_ingress_svc
+
+  - name: Print Kubera Access IP
+    debug:
+      msg: "Access Kubera at http://{{ kubera_ingress_svc.stdout.split()[2] }} Default credentials: admin:kubera"

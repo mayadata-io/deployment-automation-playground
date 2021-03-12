@@ -11,7 +11,7 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS="mayastor.yml "
+PLAYBOOKS="mayastor.yml kubera.yml"
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
