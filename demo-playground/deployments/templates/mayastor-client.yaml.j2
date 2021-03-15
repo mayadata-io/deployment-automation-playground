@@ -1,0 +1,11 @@
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: mayastor-client
+spec:
+  containers:
+    - name: mayastor-client
+      image: mayadata/mayastor-client
+      command: [ "/bin/sh", "-c", "--" ]
+      args: [ "while true; do sleep 30; done;" ]

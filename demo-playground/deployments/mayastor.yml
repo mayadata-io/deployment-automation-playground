@@ -282,6 +282,27 @@
           set_fact:
             pv_name: "{{ _pvc['resources'][0]['spec']['volumeName'] }}"
 
+    - name: deploy mayastor-client pod
+      block:
+        - name: create mayastor-client.yaml
+          template:
+            src: templates/mayastor-client.yaml.j2
+            dest: "{{ DIR }}/workspace/mayastor-client.yaml"
+
+        - name: create mayastor-client pod
+          k8s:
+            state: present
+            namespace: mayastor
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/mayastor-client.yaml"
+
+        - name: wait for mayastor-client pod to come up
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" -n mayastor -o json get pods mayastor-client
+          register: mayastor_client_pod_status
+          until: (mayastor_client_pod_status.stdout|from_json).status.phase == "Running"
+          retries: 50
+
     - name: deploy FIO pod and run a benchmark
       block:
         - name: Create fio.yaml
