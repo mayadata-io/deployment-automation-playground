@@ -67,6 +67,15 @@ function kubespray {
   cd $DIR/workspace
   sleep 5
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat /etc/kubernetes/admin.conf" > admin.conf
+  KUBE_API=$(python -c "import yaml; \
+            f=open('$DIR/workspace/admin.conf','r'); \
+            y=yaml.safe_load(f); \
+            print(y['clusters'][0]['cluster']['server'])"|awk -F':' '{ print $2 }')
+  if [[ "$KUBE_API" == "//127.0.0.1" ]]; then
+    MASTER="$(ansible-inventory -i $DIR/workspace/inventory.ini --host 'kube-master[0]' --toml|grep ansible_host|awk '{ print $NF }')"
+    MASTER=`echo $MASTER|tr -d '"'`
+    sed -i "s/127.0.0.1/$MASTER/g" $DIR/workspace/admin.conf
+  fi
   export KUBECONFIG="$DIR/workspace/admin.conf"
 }
 

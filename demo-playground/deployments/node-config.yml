@@ -16,6 +16,7 @@
       - nvme-core
       - nvme-tcp
       - nvmet
+      - vfio-pci
 
     #iscsid is optional if nvmf mode or localPV mode are in use
     enable_iscsi: true

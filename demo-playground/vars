@@ -11,7 +11,7 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS="mayastor.yml kubera.yml"
+PLAYBOOKS="mayastor.yml"
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
@@ -27,64 +27,69 @@ KSPRAY_RELEASE="release-2.15"   # Kubespray version (git branch)
 K3S_VERSION="v1.20.4+k3s1"      # K3S version
 
 # Provisioning variables
-# Platform specific vars are expected here, formatting for variables follows the terraform convention
-PLATFORM="azure"
-LOCATION="eastus"
+# Platform specific vars are expected here, formatting for variables follows the terraform convention#
+# NOTE: for mayastor pools to be provisioned, the device they will be on needs to be specified inside the STORAGE_NODES variable
+# The msp variable should point at the device in use, it can be something as simple as /dev/sda or direct PCI e.g. pcie:///00:1f.0
+# or anything else Mayastor supports (see Mayastor docs). If unsure what to choose, cerate a VM of the required type, log into it
+# and review the devices available using lspci/lsblk/etc
+#
+#PLATFORM="azure"
+#LOCATION="eastus"
 #OS_IMAGE='{
 #    publisher = "OpenLogic"
 #    offer     = "CentOS"
 #    sku       = "8_3-gen2"
 #    version   = "latest"
 #    }'
-OS_IMAGE='{
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-focal"
-    sku       = "20_04-lts-gen2"
-    version   = "latest"
-    }'
-STORAGE_NODES='{
-    count        = 3
-    type         = "Standard_L8s_v2"
-    os_disk_size = 50
-    msp          = "/dev/nvme0n1"
-    }'
-MASTER_NODES='{
-    count        = 1
-    type         = "Standard_D2s_v4"
-    os_disk_size = 40
-    }'
-WORKER_NODES='{
-    count        = 3
-    type         = "Standard_D8s_v4"
-    os_disk_size = 40
-    }'
-
-#PLATFORM="aws"
-#LOCATION="us-east-1"
 #OS_IMAGE='{
-#  ami_id = "ami-0d6e9a57f6259ba3a"
-#  user   = "centos"
-#  }'
-#OS_IMAGE='{
-#    ami_id = "ami-042e8287309f5df03"
-#    user   = "ubuntu"
-#}'
+#    publisher = "Canonical"
+#    offer     = "0001-com-ubuntu-server-focal"
+#    sku       = "20_04-lts-gen2"
+#    version   = "latest"
+#    }'
 #STORAGE_NODES='{
-#    count = 3
-#    type = "m5ad.2xlarge"
-#    os_disk_size = 40
-#    msp = "/dev/nvme1n1"
+#    count        = 3
+#    type         = "Standard_L8s_v2"
+#    os_disk_size = 50
+#    msp          = "/dev/nvme0n1"
 #    }'
 #MASTER_NODES='{
-#    count = 1
-#    type = "m5.xlarge"
-#    os_disk_size = 60
-#    }'
-#WORKER_NODES='{
-#    count = 3
-#    type = "m5a.2xlarge"
+#    count        = 1
+#    type         = "Standard_D2s_v4"
 #    os_disk_size = 40
 #    }'
+#WORKER_NODES='{
+#    count        = 3
+#    type         = "Standard_D8s_v4"
+#    os_disk_size = 40
+#    }'
+
+PLATFORM="aws"
+LOCATION="us-east-1"
+OS_IMAGE='{
+  ami_id = "ami-0d6e9a57f6259ba3a"
+  user   = "centos"
+  }'
+OS_IMAGE='{
+    ami_id = "ami-042e8287309f5df03"
+    user   = "ubuntu"
+}'
+STORAGE_NODES='{
+    count = 3
+    type = "m5dn.4xlarge"
+    os_disk_size = 40
+    msp = "pcie:///0000:00:1f.0"
+    }'
+MASTER_NODES='{
+    count = 1
+    type = "m5.xlarge"
+    os_disk_size = 60
+    }'
+WORKER_NODES='{
+    count = 3
+    type = "m5n.2xlarge"
+    os_disk_size = 40
+    }'
 
 #Node tuning variables
 NR_HUGEPAGES=1024
@@ -100,5 +105,11 @@ ENABLE_ISCSI="false"
 RUN_FIO="true"
 
 #List of PVC dicts containing name:size
-PVC='[{"name":"pvc1","size":"100Gi"},{"name":"pvc2","size":"200Gi"},{"name":"pvc3","size":"300Gi"}]'
+#Format:
+# PVC='[
+#  {"name":"pvc_name", "size":"100Gi"},
+#  {"name":"other_pvc", "size":"50Gi"}
+#]'
+PVC='[{"name":"mayapvc","size":"100Gi"}]'
+
 

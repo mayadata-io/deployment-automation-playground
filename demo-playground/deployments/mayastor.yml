@@ -215,6 +215,20 @@
             msp: "{{ hostvars[item].msp_disk }}"
             node_name: "{{ item }}"
 
+        - name: unbind PCI addresses if in use
+          shell: |
+            if [[ -f "/sys/bus/pci/drivers/nvme/{{ hostvars[item].msp_disk.split('///')[-1] }}/driver_override" ]]; then
+              echo vfio-pci | sudo tee "/sys/bus/pci/drivers/nvme/{{ hostvars[item].msp_disk.split('///')[-1] }}/driver_override"
+              echo "{{ hostvars[item].msp_disk.split('///')[-1] }}" | sudo tee /sys/bus/pci/drivers/nvme/unbind
+            else
+              printf "Already unbound or not present"
+            fi
+          become_user: root
+          become: true
+          delegate_to: "{{ item }}"
+          with_inventory_hostnames: mayastor_storage
+          when: hostvars[item].msp_disk.startswith('pcie')
+
         - name: create MSPs
           k8s:
             state: present
@@ -344,3 +358,8 @@
           debug:
             msg: "{{ bench_out.stdout.split('\n') }}"
       when: run_fio|bool
+
+
+
+#NOTES:
+#echo '0000:00:1f.0' > /sys/bus/pci/devices/0000\:00\:1f.0/driver/unbind
