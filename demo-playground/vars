@@ -78,7 +78,7 @@ STORAGE_NODES='{
     count = 3
     type = "m5dn.4xlarge"
     os_disk_size = 40
-    msp = "pcie:///0000:00:1f.0"
+    msp = "uring:///dev/nvme1n1"
     }'
 MASTER_NODES='{
     count = 1

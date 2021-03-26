@@ -109,7 +109,9 @@ EOF
   export KUBECONFIG="$DIR/workspace/admin.conf"
 }
 
-function start_vpn { #Start VPN
+function start_vpn { #Start sshuttle VPN
+  # List of subnets to tunnel
+  VPN_SUBNETS="10.0.1.0/24 10.244.0.0/16 10.42.0.0/16 10.43.0.0/16"
 
   cd $DIR/deployments
   BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')
@@ -121,7 +123,7 @@ function start_vpn { #Start VPN
 #!/bin/bash
 set -e
 pkill sshuttle || echo "sshuttle starting"
-nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION 10.0.0.0/8 &
+nohup sshuttle -e 'ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' -r $SSH_USER@$BASTION $VPN_SUBNETS &
 EOF
   #TODO: 10.0.0.0/8 could be smarter, but since we want to cover both 10.0.1.0/24 and the SDN, this will do for now
   chmod +x $DIR/workspace/start_vpn.sh

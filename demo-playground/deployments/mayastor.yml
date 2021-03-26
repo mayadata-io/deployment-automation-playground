@@ -1,17 +1,67 @@
+
+- name: Configure CPU isolation for Mayastor
+  hosts: mayastor_storage
+  become: true
+  become_user: root
+  tasks:
+    - name: find out CPU layout
+      script: files/cpu_picker.py
+      args:
+        executable: "{{ discovered_interpreter_python }}"
+      register: isolcpus_out
+
+    - name: inject isolcpus into GRUB
+      lineinfile:
+        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+        line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus={{ isolcpus_out.stdout_lines[0] }}"'
+        state: present
+        create: yes
+        path: "/etc/default/grub"
+      register: grub_edit
+
+    - name: get rid of cloud grub config
+      file:
+        path: /etc/default/grub.d/50-cloudimg-settings.cfg
+        state: absent
+      register: cloud_conf_remove
+
+    - name: run update-grub
+      shell: |
+        update-grub
+      when: grub_edit.changed or cloud_conf_remove.changed
+
+    - name: reboot nodes
+      reboot:
+        reboot_timeout: 3600
+      when: grub_edit.changed or cloud_conf_remove.changed
+
+    - set_fact:
+        isolcpus: "{{ isolcpus_out.stdout_lines[0] }}"
+      run_once: true
+
+    - add_host:
+        name: "variable_holder"
+        isolcpus:  "{{ isolcpus }}"
+      run_once: true
+
+    - name: check for isolation being enabled
+      shell: |
+        cat /sys/devices/system/cpu/isolated
+      register: isolation_out
+
+    - debug:
+        msg: "CPU isolation: {{ isolation_out.stdout }}"
+
 - name: Install Mayastor modules
   hosts: localhost
   vars:
     DIR: "../workspace/"
-    limits:
-      cpu: "6"
-      memory: "1024Mi"
-      hugepages2Mi: "2Gi"
 
     #per mayastor spec, can be "nvmf" or "iscsi"
     storage_protocol: "nvmf"
 
       #if no replica_count is defined, it defaults to the number of mayastor nodes
-    #replica_count: 3
+    replica_count: 2
 
     #create the following PVCs
     pvc:
@@ -29,6 +79,12 @@
     run_fio: true
 
   tasks:
+    - set_fact:
+        new_limits:
+          cpu: "{{ hostvars['variable_holder']['isolcpus'].split(',')|count }}"
+          memory: "{{ limits.memory }}"
+          hugepages2Mi: "{{ limits.hugepages2Mi }}"
+
     - name: Apply labels to each storage node
       k8s:
         kubeconfig: "{{ DIR }}/workspace/admin.conf"
@@ -165,12 +221,13 @@
           python -c 'import yaml; \
             f=open("{{ DIR }}/workspace/mayastor-daemonset.yaml","r"); \
             y=yaml.safe_load(f); \
-            y["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["cpu"] = "{{ limits.cpu }}"; \
-            y["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["memory"] = "{{ limits.memory}}"; \
-            y["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["hugepages-2Mi"] = "{{ limits.hugepages2Mi}}"; \
-            y["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["cpu"] = "{{ limits.cpu }}"; \
-            y["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["memory"] = "{{ limits.memory}}"; \
-            y["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["hugepages-2Mi"] = "{{ limits.hugepages2Mi}}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["cpu"] = "{{ new_limits.cpu }}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["memory"] = "{{ new_limits.memory}}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]["hugepages-2Mi"] = "{{ new_limits.hugepages2Mi}}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["cpu"] = "{{ new_limits.cpu }}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["memory"] = "{{ new_limits.memory}}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["resources"]["requests"]["hugepages-2Mi"] = "{{ new_limits.hugepages2Mi}}"; \
+            y["spec"]["template"]["spec"]["containers"][0]["args"] = ["-l{{ hostvars['variable_holder']['isolcpus'] }}" if x.startswith("-l") else x for x in y["spec"]["template"]["spec"]["containers"][0]["args"]]; \
             print(yaml.dump(y, default_flow_style=False, sort_keys=False))'
         register: mayastor_dset_upd
 
