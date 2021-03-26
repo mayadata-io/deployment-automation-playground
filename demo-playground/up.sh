@@ -130,6 +130,7 @@ EOF
   $DIR/workspace/start_vpn.sh
   # Wait for all nodes to come up and become available
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
+  ansible -m ping -i $DIR/workspace/inventory.ini -T 120 all
   cd $DIR
 }
 

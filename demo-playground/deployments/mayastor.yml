@@ -12,7 +12,7 @@
 
     - name: inject isolcpus into GRUB
       lineinfile:
-        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT='
+        regexp: '^GRUB_CMDLINE_LINUX_DEFAULT'
         line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus={{ isolcpus_out.stdout_lines[0] }}"'
         state: present
         create: yes

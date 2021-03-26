@@ -8,8 +8,10 @@
     # Add required package names below
     deb_prerequisites:
       - open-iscsi
+      - cryptsetup
     rpm_prerequisites:
       - iscsi-initiator-utils
+      - cryptsetup
 
     # Add required kmod names below
     kmods:
@@ -18,14 +20,29 @@
       - nvmet
       - vfio-pci
 
+    sysctl:
+      - "net.core.rmem_max = 268435456"
+      - "net.core.wmem_max = 268435456"
+      - "net.ipv4.tcp_rmem = 4096 87380 134217728"
+      - "net.ipv4.tcp_wmem = 4096 65536 134217728"
+      - "net.core.optmem_max = 16777216"
+      - "vm.nr_hugepages = {{ nr_hugepages }}"
+
     #iscsid is optional if nvmf mode or localPV mode are in use
     enable_iscsi: true
 
   tasks:
+    - name: set up sysctl
+      lineinfile:
+        path: /etc/sysctl.conf
+        line: "{{ item }}"
+        state: present
+      loop: "{{ sysctl }}"
+
     - name: Set up hugepages
       shell: |
         echo "{{ nr_hugepages }}" | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
-        echo vm.nr_hugepages = "{{ nr_hugepages }}" | sudo tee -a /etc/sysctl.conf
+        sysctl -p
 
     - name: Upgrade all packages to the latest version
       apt:
