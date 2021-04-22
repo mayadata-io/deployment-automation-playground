@@ -2,19 +2,19 @@
 [all]
 
 %{ for index, ip in master-ip ~}
-${setup_name}-master-${index} ansible_host=${ip} ansible_user=${ssh_user} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${ip}
+${setup_name}-master-${index} ansible_host=${ip} ansible_user=${ssh_user} ansible_ssh_private_key_file=${ssh_key} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${ip}
 %{ endfor ~}
 
 %{ for index, ip in worker-ip ~}
-${setup_name}-worker-${index} ansible_host=${ip} ansible_user=${ssh_user} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${ip}
+${setup_name}-worker-${index} ansible_host=${ip} ansible_user=${ssh_user} ansible_ssh_private_key_file=${ssh_key} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${ip}
 %{ endfor ~}
 
 %{ for index, ip in storage-ip ~}
-${setup_name}-storage-${index} ansible_host=${ip} ansible_user=${ssh_user} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${ip} msp_disk='${msp_disk}'
+${setup_name}-storage-${index} ansible_host=${ip} ansible_user=${ssh_user} ansible_ssh_private_key_file=${ssh_key} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${ip} msp_disk='${msp_disk}'
 %{ endfor ~}
 
 # Bastion host for remote access
-bastion ansible_host=${bastion-ip} ansible_user=${ssh_user} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${bastion-ip}
+bastion ansible_host=${bastion-ip} ansible_user=${ssh_user} ansible_ssh_private_key_file=${ssh_key} ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' ip=${bastion-ip}
 
 %{ if k8s == "kubespray" ~}
 # Kubespray inventory
@@ -31,6 +31,13 @@ ${setup_name}-master-${index}
 %{ for index, ip in worker-ip ~}
 %{ if index < (3 - length(master-ip)) ~}
 ${setup_name}-worker-${index}
+%{ endif ~}
+%{ endfor ~}
+%{ endif ~}
+%{ if length(master-ip) + length(worker-ip) < 3 }
+%{ for index, ip in storage-ip ~}
+%{ if index < (3 - (length(master-ip) + length(worker-ip))) ~}
+${setup_name}-storage-${index}
 %{ endif ~}
 %{ endfor ~}
 %{ endif ~}
