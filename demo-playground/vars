@@ -11,7 +11,7 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS="mayastor.yml"
+PLAYBOOKS="colocated-nexus.yml"
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
@@ -21,8 +21,8 @@ SSH_PUBKEY=~/.ssh/id_rsa.pub
 
 
 # Kubernetes installer to use. Options are kubespray, k3s, more to be added
-#K8S_INSTALLER="kubespray"
-K8S_INSTALLER="k3s"
+K8S_INSTALLER="kubespray"
+#K8S_INSTALLER="k3s"
 KSPRAY_RELEASE="release-2.15"   # Kubespray version (git branch)
 K3S_VERSION="v1.20.4+k3s1"      # K3S version
 
@@ -66,17 +66,17 @@ K3S_VERSION="v1.20.4+k3s1"      # K3S version
 
 PLATFORM="aws"
 LOCATION="us-east-1"
-OS_IMAGE='{
-  ami_id = "ami-0d6e9a57f6259ba3a"
-  user   = "centos"
-  }'
+#OS_IMAGE='{
+#  ami_id = "ami-0d6e9a57f6259ba3a"
+#  user   = "centos"
+#  }'
 OS_IMAGE='{
     ami_id = "ami-042e8287309f5df03"
     user   = "ubuntu"
 }'
 STORAGE_NODES='{
     count = 3
-    type = "m5dn.4xlarge"
+    type = "m5d.4xlarge"
     os_disk_size = 40
     msp = "uring:///dev/nvme1n1"
     }'
@@ -86,8 +86,8 @@ MASTER_NODES='{
     os_disk_size = 60
     }'
 WORKER_NODES='{
-    count = 3
-    type = "m5n.2xlarge"
+    count = 0
+    type = "m5.2xlarge"
     os_disk_size = 40
     }'
 
@@ -95,14 +95,14 @@ WORKER_NODES='{
 NR_HUGEPAGES=1024
 
 #Mayastor variables
-CPU_LIMIT=6
+CPU_LIMIT=4
 MEMORY_LIMIT="1024Mi"
 HUGEPAGES_2MI="2Gi"
 STORAGE_PROTOCOL="nvmf"
-REPLICA_COUNT=3
 PROJECT_NAMESPACE="default"
 ENABLE_ISCSI="false"
-RUN_FIO="true"
+RUN_FIO="false"
+REPLICA_COUNT=3
 
 #List of PVC dicts containing name:size
 #Format:
@@ -110,6 +110,10 @@ RUN_FIO="true"
 #  {"name":"pvc_name", "size":"100Gi"},
 #  {"name":"other_pvc", "size":"50Gi"}
 #]'
-PVC='[{"name":"mayapvc","size":"100Gi"}]'
+PVC='[
+  {"name":"pvc0","size":"10Gi"},
+  {"name":"pvc1","size":"10Gi"},
+  {"name":"pvc2","size":"10Gi"}
+]'
 
 
