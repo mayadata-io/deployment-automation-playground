@@ -1,0 +1,365 @@
+# TODO: decide on how isolation should behave in an HCI usecase and implement
+# - name: Configure CPU isolation for Mayastor
+#   hosts: mayastor_storage
+#   become: true
+#   become_user: root
+#   tasks:
+#     - name: find out CPU layout
+#       script: files/cpu_picker.py
+#       args:
+#         executable: "{{ discovered_interpreter_python }}"
+#       register: isolcpus_out
+
+#     - name: inject isolcpus into GRUB
+#       lineinfile:
+#         regexp: '^GRUB_CMDLINE_LINUX_DEFAULT'
+#         line: 'GRUB_CMDLINE_LINUX_DEFAULT="quiet splash isolcpus={{ isolcpus_out.stdout_lines[0] }}"'
+#         state: present
+#         create: yes
+#         path: "/etc/default/grub"
+#       register: grub_edit
+
+#     - name: get rid of cloud grub config
+#       file:
+#         path: /etc/default/grub.d/50-cloudimg-settings.cfg
+#         state: absent
+#       register: cloud_conf_remove
+
+#     - name: run update-grub
+#       shell: |
+#         update-grub
+#       when: grub_edit.changed or cloud_conf_remove.changed
+
+#     - name: reboot nodes
+#       reboot:
+#         reboot_timeout: 3600
+#       when: grub_edit.changed or cloud_conf_remove.changed
+
+#     - set_fact:
+#         isolcpus: "{{ isolcpus_out.stdout_lines[0] }}"
+#       run_once: true
+
+#     - add_host:
+#         name: "variable_holder"
+#         isolcpus:  "{{ isolcpus }}"
+#       run_once: true
+
+#     - name: check for isolation being enabled
+#       shell: |
+#         cat /sys/devices/system/cpu/isolated
+#       register: isolation_out
+
+#     - debug:
+#         msg: "CPU isolation: {{ isolation_out.stdout }}"
+
+- name: Install Mayastor modules
+  hosts: localhost
+  vars:
+    DIR: "../workspace/"
+
+    #per mayastor spec, can be "nvmf" or "iscsi"
+    storage_protocol: "nvmf"
+
+      #if no replica_count is defined, it defaults to the number of mayastor nodes
+    replica_count: 2
+
+    #create the following PVCs
+    pvc:
+      - name: pvc1
+        size: 50Gi
+      - name: pvc2
+        size: 20Gi
+      - name: pvc3
+        size: 100Gi
+
+    #set the required namespace here, if not set, will default to "default"
+    #project_namespace: myproject
+
+    #deploy the FIO pod and run a benchmark
+    run_fio: true
+
+  tasks:
+    - set_fact:
+        new_limits:
+          cpu: "0,1,2,3"
+          memory: "{{ limits.memory }}"
+          hugepages2Mi: "{{ limits.hugepages2Mi }}"
+
+    - name: Apply labels to each storage node
+      k8s:
+        kubeconfig: "{{ DIR }}/workspace/admin.conf"
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Node
+          metadata:
+            name: "{{ item }}"
+            labels:
+              openebs.io/engine: "mayastor"
+      with_inventory_hostnames: mayastor_storage
+
+    - name: create mayastor namespace
+      k8s:
+        name: mayastor
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: "{{ DIR }}/workspace/admin.conf"
+
+    - name: RBAC
+      block:
+      - name: download moac-rbac.yaml
+        get_url:
+          url: "https://raw.githubusercontent.com/openebs/Mayastor/master/deploy/moac-rbac.yaml"
+          dest: "{{ DIR}}/workspace/moac-rbac.yaml"
+          mode: 0644
+
+      - name: create mayastor RBAC resources
+        k8s:
+          state: present
+          src: "{{ DIR }}/workspace/moac-rbac.yaml"
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+
+    - name: Mayastor CRDs
+      block:
+      - name: download CRDs mayastorpool.yaml
+        get_url:
+          url: "https://raw.githubusercontent.com/openebs/Mayastor/master/csi/moac/crds/mayastorpool.yaml"
+          dest: "{{ DIR }}/workspace/mayastorpool.yaml"
+          mode: 0644
+
+      - name: create mayastor CRDs
+        k8s:
+          state: present
+          src: "{{ DIR }}/workspace/mayastorpool.yaml"
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+
+    - name: NATS
+      block:
+      - name: deploy NATS
+        k8s:
+          state: present
+          src: "files/colocated-nexus-nats.yaml"
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+
+      - name: wait for NATS pods to come up
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: Pod
+          namespace: mayastor
+          label_selectors:
+            - app = nats
+        register: kubectl_get_pods_nats
+        until: kubectl_get_pods_nats['resources'][0]['status']['phase'] == "Running"
+        retries: 50
+
+    - name: CSI node plugin
+      block:
+      - name: deploy CSI daemonset
+        k8s:
+          state: present
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          src: "files/colocated-nexus-csi-daemonset.yaml"
+
+      - name: Verify that the CSI Node Plugin DaemonSet has been correctly deployed to all worker nodes in the cluster
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: DaemonSet
+          namespace: mayastor
+          name: mayastor-csi
+        register: kubectl_get_dset_csi
+        until: kubectl_get_dset_csi['resources'][0]['status']['numberReady'] >= (groups['mayastor_clients']|count + groups['mayastor_storage']|count)
+        retries: 50
+
+    - name: Control Plane
+      block:
+      - name: apply control plane definitions
+        k8s:
+          state: present
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          src: "files/colocated-nexus-moac-deployment.yaml"
+
+      - name: verify the control plane pods are running
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: Pod
+          namespace: mayastor
+          label_selectors:
+            - app = moac
+        register: kubectl_get_moac_cp
+        until: kubectl_get_moac_cp['resources'][0]['status']['phase'] == "Running"
+        retries: 50
+
+    - name: Data Plane
+      block:
+      - name: deploy data plane daemonset
+        k8s:
+          state: present
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          src: "files/colocated-nexus-mayastor-daemonset.yaml"
+
+      - name: verify data plane daemonset is running
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: DaemonSet
+          namespace: mayastor
+          name: mayastor
+        register: kubectl_get_dset_mayastor
+        until: kubectl_get_dset_mayastor['resources'][0]['status']['numberReady'] == groups['mayastor_storage']|count
+        retries: 50
+
+      - name: get list of MSNs and compare to mayastor nodes in inventory (count only)
+        k8s_info:
+          api_version: "openebs.io/v1alpha1"
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          namespace: mayastor
+          kind: MayastorNode
+        register: get_msn
+        until: get_msn['resources']|count == groups['mayastor_storage']|count
+
+    - name: Create Mayastor pool definitions
+      block:
+        - name: generate a pool per node
+          template:
+            src: templates/msp.yaml.j2
+            dest: "{{ DIR }}/workspace/msp-{{ item }}.yaml"
+          with_inventory_hostnames: mayastor_storage
+          vars:
+            msp: "{{ hostvars[item].msp_disk }}"
+            node_name: "{{ item }}"
+
+        - name: unbind PCI addresses if in use
+          shell: |
+            if [[ -f "/sys/bus/pci/drivers/nvme/{{ hostvars[item].msp_disk.split('///')[-1] }}/driver_override" ]]; then
+              echo vfio-pci | sudo tee "/sys/bus/pci/drivers/nvme/{{ hostvars[item].msp_disk.split('///')[-1] }}/driver_override"
+              echo "{{ hostvars[item].msp_disk.split('///')[-1] }}" | sudo tee /sys/bus/pci/drivers/nvme/unbind
+            else
+              printf "Already unbound or not present"
+            fi
+          become_user: root
+          become: true
+          delegate_to: "{{ item }}"
+          with_inventory_hostnames: mayastor_storage
+          when: hostvars[item].msp_disk.startswith('pcie')
+
+        - name: create MSPs
+          k8s:
+            state: present
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/msp-{{ item }}.yaml"
+          with_inventory_hostnames: mayastor_storage
+
+        - name: verify MSPs are up
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" -n mayastor -o json get msp "msp-{{ item }}"
+          register: msp_status
+          with_inventory_hostnames: mayastor_storage
+          until: (msp_status.stdout|from_json).status.state == "online"
+
+    - name: Create Mayastor StorageClass
+      block:
+        - name: generate MCS from template
+          template:
+            src: templates/storageclass.yaml.j2
+            dest: "{{ DIR }}/workspace/storageclass.yaml"
+          vars:
+            replicas: "{{ replica_count|default(groups['mayastor_storage']|count) }}"
+            protocol: "{{ storage_protocol }}"
+
+        - name: create storageClass
+          k8s:
+            state: present
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/storageclass.yaml"
+
+    - name: Create a Persistent Volume Claim
+      block:
+        - name: create PVC definition
+          template:
+            src: templates/pvc.yaml.j2
+            dest: "{{ DIR }}/workspace/pvc-{{ item.name }}.yaml"
+          vars:
+            sc_name: "mayastor-{{ storage_protocol }}"
+            pvc_name: "{{ item.name }}"
+            pvc_size: "{{ item.size }}"
+          loop: "{{ pvc }}"
+
+        - name: create pvc
+          k8s:
+            state: present
+            namespace: "{{ project_namespace|default('default') }}"
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/pvc-{{ item.name }}.yaml"
+          loop: "{{ pvc }}"
+
+        - name: extract the volume from the first PVC
+          k8s_info:
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            namespace: "{{ project_namespace|default('default') }}"
+            kind: PersistentVolumeClaim
+            name: "{{ pvc[0].name }}"
+            api_version: "v1"
+          register: _pvc
+          until: _pvc['resources'][0]['status']['phase'] == "Bound"
+
+    - name: Place data in PVs
+      block:
+        - name: generate prep pods
+          template:
+            src: templates/web-prep.yaml.j2
+            dest: "{{ DIR }}/workspace/web_prep_{{ item.0 }}.yaml"
+          vars:
+            pod_name: "prep-{{ item.0 }}"
+            node_name: "{{ groups['mayastor_storage'][item.0] }}"
+            volume: "vol-{{ item.0 }}"
+            volume_claim: "{{ item.1.name }}"
+          with_indexed_items: "{{ pvc }}"
+
+        - name: create prep pods
+          k8s:
+            state: present
+            namespace: "{{ project_namespace|default('default') }}"
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/web_prep_{{ item.0 }}.yaml"
+          with_indexed_items: "{{ pvc }}"
+
+    - name: Start workload
+      block:
+        - name: generate pods
+          template:
+            src: templates/web.yaml.j2
+            dest: "{{ DIR }}/workspace/web_{{ item.0 }}.yaml"
+          vars:
+            pod_name: "web-{{ item.0 }}"
+            node_name: "{{ groups['mayastor_storage'][item.0] }}"
+            volume: "vol-{{ item.0 }}"
+            volume_claim: "{{ item.1.name }}"
+          with_indexed_items: "{{ pvc }}"
+
+        - name: create workload pods
+          k8s:
+            state: present
+            namespace: "{{ project_namespace|default('default') }}"
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/web_{{ item.0 }}.yaml"
+          with_indexed_items: "{{ pvc }}"
+
+        - name: wait for web pods to come up
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" get pods -l pod=colo-nexus-web -n "{{ project_namespace|default('default') }}" |grep Running|wc -l
+          register: kubectl_get_pods_web
+          until: kubectl_get_pods_web.stdout|int == pvc|count
+          retries: 50
+
+        - name: delete prep pods
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" delete jobs -l job=colo-nexus-prep -n "{{ project_namespace|default('default') }}"
+
+        - name: grab pods info
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" get pods -l pod=colo-nexus-web -n "{{ project_namespace|default('default') }}" -o wide
+          register: kubectl_get_web_pods
+
+        - name: Print running pods
+          debug:
+            msg: "{{ kubectl_get_web_pods.stdout.split('\n') }}"
