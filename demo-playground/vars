@@ -11,7 +11,7 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS="colocated-nexus.yml"
+PLAYBOOKS=""
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
@@ -81,7 +81,7 @@ STORAGE_NODES='{
     msp = "uring:///dev/nvme1n1"
     }'
 MASTER_NODES='{
-    count = 1
+    count = 1 
     type = "m5.xlarge"
     os_disk_size = 60
     }'
@@ -95,7 +95,7 @@ WORKER_NODES='{
 NR_HUGEPAGES=1024
 
 #Mayastor variables
-CPU_LIMIT=4
+CPU_LIMIT=2
 MEMORY_LIMIT="1024Mi"
 HUGEPAGES_2MI="2Gi"
 STORAGE_PROTOCOL="nvmf"
@@ -110,10 +110,13 @@ REPLICA_COUNT=3
 #  {"name":"pvc_name", "size":"100Gi"},
 #  {"name":"other_pvc", "size":"50Gi"}
 #]'
+
 PVC='[
   {"name":"pvc0","size":"10Gi"},
   {"name":"pvc1","size":"10Gi"},
   {"name":"pvc2","size":"10Gi"}
 ]'
+
+#PVC='[{"name":"pvc0","size":"10Gi"}]'
 
 

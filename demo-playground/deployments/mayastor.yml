@@ -157,7 +157,7 @@
             - app = nats
         register: kubectl_get_pods_nats
         until: kubectl_get_pods_nats['resources'][0]['status']['phase'] == "Running"
-        retries: 50
+        retries: 200
 
     - name: CSI node plugin
       block:

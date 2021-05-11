@@ -1,161 +1,24 @@
-# E2E automation framework
+# OpenShift Clients
 
-This is a set of scripts that provision cloud instances, deploy K8S, tune nodes and deploy mayastor and other platforms
+The OpenShift client `oc` simplifies working with Kubernetes and OpenShift
+clusters, offering a number of advantages over `kubectl` such as easy login,
+kube config file management, and access to developer tools. The `kubectl`
+binary is included alongside for when strict Kubernetes compliance is necessary.
 
-Provisioning is done via Terraform
-The rest is done by Ansible
-The glue script representing a pipeline is `up.sh`
+To learn more about OpenShift, visit [docs.openshift.com](https://docs.openshift.com)
+and select the version of OpenShift you are using.
 
-## General approach
+## Installing the tools
 
-Each part of the process can be decoupled from the rest. We can skip provisioning or K8S installation if we have a working inventory for ansible plays to use, and a working Kubernetes setup for example.
+After extracting this archive, move the `oc` and `kubectl` binaries
+to a location on your PATH such as `/usr/local/bin`. Then run:
 
-All we require is ssh connectivity to the first master node in the inventory. It is used as the bastion host for `sshuttle` which provides VPN-like functionality right into the private network. If the host executing the scripts is already local to the rest of the setup, remove the `start_vpn` stage from `STAGES`
+    oc login [API_URL]
 
-## Workflow
+to start a session against an OpenShift cluster. After login, run `oc` and
+`oc help` to learn more about how to get started with OpenShift.
 
-### Provision a cluster, deploy mayastor
+## License
 
-1. Edit the `vars` file.
-2. Run `up.sh`
-3. Wait...
-
-### Teardown the setup
-
-Run `down.sh`
-
-### `vars` file settings
-
-The file is heavily commented, please review it before running `up.sh`
-
-Important:
-
-- Set the STAGES to execute, if provisioning is selected, set the platform and it's __specific variables__.
-- If k8s install is selected, set the K8S_INSTALLER type.
-- Add the playbooks you wish to apply in the PLAYBOOKS variable (in the order you want them to be applied)
-
-## Skipping stages
-
-Any stage can be skipped. If a stage is skipped, the setup might be missing certain files that would need to be added manually.
-
-#### Skipped provisioning
-
-If the provisioning stage is skipped (you are installing on baremetal or on your own, already installed set of VMs), a manually created inventory needs to be placed in the `workspace` directory.
-
-Here is an example `workspace/inventory.ini`:
-
-```
-# general host configuration and per-host variables
-[all]
-maya-demo-master-0 ansible_host=10.0.1.69 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
-maya-demo-worker-0 ansible_host=10.0.1.102 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
-maya-demo-worker-1 ansible_host=10.0.1.100 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
-maya-demo-worker-2 ansible_host=10.0.1.54 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
-
-# the nodes containing storage need to have an additonal msp_disk variable pointing to the device that Mayastor will use. For now it can be a single disk only
-maya-demo-storage-0 ansible_host=10.0.1.132 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' msp_disk='/dev/nvme1n1'
-maya-demo-storage-1 ansible_host=10.0.1.228 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' msp_disk='/dev/nvme1n1'
-maya-demo-storage-2 ansible_host=10.0.1.219 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no' msp_disk='/dev/nvme1n1'
-
-# Bastion host for remote access, typically the public IP of the first master node. Can be skipped if the nodes are local to the ansible executor.
-bastion ansible_host=3.89.245.139 ansible_user=centos ansible_ssh_common_args='-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no'
-
-# Kubespray inventory - add only if kubespray will be used
-[kube-master]
-maya-demo-master-0
-
-[etcd]
-maya-demo-master-0
-maya-demo-worker-0
-maya-demo-worker-1
-
-[kube-node]
-maya-demo-worker-0
-maya-demo-worker-1
-maya-demo-worker-2
-maya-demo-storage-0
-maya-demo-storage-1
-maya-demo-storage-2
-
-[calico-rr]
-
-[k8s-cluster:children]
-kube-master
-kube-node
-
-# K3S inventory - add only if K3S is going to be used
-[master]
-maya-demo-master-0
-
-[node]
-maya-demo-worker-0
-maya-demo-worker-1
-maya-demo-worker-2
-maya-demo-storage-0
-maya-demo-storage-1
-maya-demo-storage-2
-
-[k3s_cluster:children]
-master
-node
-
-# Mayastor inventory (we need to separate between client workers and storage workers in this one)
-[mayastor_clients]
-maya-demo-worker-0
-maya-demo-worker-1
-maya-demo-worker-2
-
-[mayastor_storage]
-maya-demo-storage-0
-maya-demo-storage-1
-maya-demo-storage-2
-
-```
-
-#### Skipped Kubernetes install
-
-In case K8S install stage is skipped (using GKE, or already running your own K8S for example) we will need to add the kubeconfig credentials file as `workspace/admin.conf`
-
-## Available playbooks:
-
-Some playbooks are used for all deployments and are excluded from this list:
-- bastion.yml - prepares the bastion host for better ssh throughput
-- node-config.yml - installs and configures the prerequisites for Mayastor on the storage and worker nodes
-#### mayastor.yml
-The playbook will install Mayastor, create the PVCs and optionally deploy an FIO testing pod and run a quick benchmark test
-
-Variables (see the `vars` file - these are all represented there):
-```yaml
-#CPU and memory limits applied to the mayastor pods
-limits:
-    cpu: "6"
-    memory: "1024Mi"
-    hugepages2Mi: "2Gi"
-
-#per mayastor spec, can be "nvmf" or "iscsi"
-storage_protocol: "nvmf"
-
-    #if no replica_count is defined, it defaults to the number of mayastor nodes
-replica_count: 3
-
-#create the following PVCs
-pvc:
-    - name: pvc1
-    size: 50Gi
-    - name: pvc2
-    size: 20Gi
-    - name: pvc3
-    size: 100Gi
-
-#deploy the FIO pod and run a benchmark
-run_fio: true
-```
-
-
-## Extending this framework
-
-- Additional plays can be added to the `deployments` directory, and optionally added to `vars` in the `PLAYBOOKS` variable.
-- Additional cloud platforms can be implemented under `prov/PLATFORM_NAME` as long as the TF code builds the same format of `inventory.ini`.
-- Different Kubernetes (and Openshift) deployments and distributions can be added to `up.sh` as a function and triggered via the `vars` file `K8S_INSTALLER` variable.
-- The `STAGES` variable describes the stages, and if a stage is to be skipped, it can be removed in `vars`.
-
+OpenShift is licensed under the Apache Public License 2.0. The source code for this
+program is [located on github](https://github.com/openshift/origin).

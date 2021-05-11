@@ -14,12 +14,6 @@ spec:
               operator: In
               values:
                 - "{{ node_name }}"
-{% for node in groups['mayastor_storage'] %}
-{% if node != node_name %}
-                - "{{ node }}"
-{% endif %}
-{% endfor %}
-
   containers:
     - name: nginx
       image: nginx
@@ -28,7 +22,7 @@ spec:
       volumeMounts:
         - name: "{{ volume }}"
           mountPath: /usr/share/nginx/html
-      restartPolicy: OnFailure
+  restartPolicy: OnFailure
   tolerations:
     - key: "node.kubernetes.io/unreachable"
       operator: "Exists"

@@ -336,6 +336,14 @@
             volume_claim: "{{ item.1.name }}"
           with_indexed_items: "{{ pvc }}"
 
+        - name: delete prep pods
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" delete jobs -l job=colo-nexus-prep -n "{{ project_namespace|default('default') }}" --field-selector status.successful=1 >/dev/null
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" get jobs -l job=colo-nexus-prep -n "{{ project_namespace|default('default') }}"|tail -n+2|wc -l
+          register: job_delete
+          until: job_delete.stderr == "No resources found in default namespace."
+          retries: 50
+
         - name: create workload pods
           k8s:
             state: present
@@ -350,10 +358,6 @@
           register: kubectl_get_pods_web
           until: kubectl_get_pods_web.stdout|int == pvc|count
           retries: 50
-
-        - name: delete prep pods
-          shell: |
-            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" delete jobs -l job=colo-nexus-prep -n "{{ project_namespace|default('default') }}"
 
         - name: grab pods info
           shell: |
