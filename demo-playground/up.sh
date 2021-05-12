@@ -158,6 +158,7 @@ EOF
 
   #Install prerequisite roles and collections
   ansible-galaxy collection install --force-with-deps -p ./collections community.kubernetes
+  ansible-galaxy collection install --force-with-deps -p ./collections community.general
   ansible-galaxy role install --force-with-deps -p ./roles linux-system-roles.kernel_settings
 
   ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" node-config.yml
@@ -166,10 +167,17 @@ EOF
 secs_to_human() {
     echo "$(( ${1} / 3600 ))h $(( (${1} / 60) % 60 ))m $(( ${1} % 60 ))s"
 }
+
+#MAIN
+
 STARTTIME=$(date +%s)
 DIR=${PWD}
 if [ ! -d workspace ]; then mkdir workspace; fi
-source $DIR/vars
+if [ -n "$1" ]; then 
+  if [ -f "$1" ]; then source "$1"; else echo "$1 not found, exiting"; exit 1; fi
+else 
+  source "$DIR/vars" 
+fi
 if [[ "$DEBUG_OUTPUT" == "true" ]]; then
   set -ex -o pipefail
 else

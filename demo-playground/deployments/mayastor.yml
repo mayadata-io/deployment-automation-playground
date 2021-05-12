@@ -318,9 +318,6 @@
 
     - name: Create a Persistent Volume Claim
       block:
-        - debug:
-            var: pvc
-
         - name: create PVC definition
           template:
             src: templates/pvc.yaml.j2
@@ -393,7 +390,7 @@
 
         - name: wait for pod to come up
           shell: |
-            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" -n "{{ project_namespace|default('default') }}" -o json get pods fio-mayastor
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" -n "{{ project_namespace|default('default') }}" -o json get pods fio
           register: fio_pod_status
           until: (fio_pod_status.stdout|from_json).status.phase == "Running"
           retries: 50
@@ -401,7 +398,7 @@
         - name: run benchmark
           shell: |
             export KUBECONFIG="{{ DIR }}/workspace/admin.conf"
-            kubectl exec -it fio-mayastor -- fio --name=benchtest --size=800m --filename=/volume/test --direct=1 --rw=randrw --ioengine=libaio --bs=4k --iodepth=16 --numjobs=8 --time_based --runtime=60
+            kubectl exec -it fio -- fio --name=benchtest --size=800m --filename=/volume/test --direct=1 --rw=randrw --ioengine=libaio --bs=4k --iodepth=16 --numjobs=8 --time_based --runtime=60
           register: bench_out
 
         - name: delete mayastor-fio pod

@@ -11,7 +11,7 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS=""
+PLAYBOOKS="localpv-lvm.yml"
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
@@ -78,7 +78,7 @@ STORAGE_NODES='{
     count = 3
     type = "m5d.4xlarge"
     os_disk_size = 40
-    msp = "uring:///dev/nvme1n1"
+    msp = "/dev/nvme1n1"
     }'
 MASTER_NODES='{
     count = 1 
@@ -101,7 +101,7 @@ HUGEPAGES_2MI="2Gi"
 STORAGE_PROTOCOL="nvmf"
 PROJECT_NAMESPACE="default"
 ENABLE_ISCSI="false"
-RUN_FIO="false"
+RUN_FIO="true"
 REPLICA_COUNT=3
 
 #List of PVC dicts containing name:size

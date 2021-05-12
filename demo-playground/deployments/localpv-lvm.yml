@@ -1,0 +1,148 @@
+---
+- name: Configure LVM VG
+  hosts: mayastor_storage
+  become: true
+  become_user: root
+  tasks:
+    - name: Create LVM VG on all the nodes
+      community.general.lvg:
+        vg: lvmvg
+        pvs: "{{ msp_disk }}"
+        pvresize: yes
+
+    
+- name: Deploy OpenEBS LocalPV LVM
+  hosts: localhost
+  vars:
+    DIR: "../workspace/"
+
+    #create the following PVCs
+    # pvc:
+    #   - name: pvc1
+    #     size: 50Gi
+    #   - name: pvc2
+    #     size: 20Gi
+    #   - name: pvc3
+    #     size: 100Gi
+
+    #set the required namespace here, if not set, will default to "default"
+    #project_namespace: myproject
+
+    run_fio: true
+
+  tasks:
+    - name: Deploy LocalPV LVM operator
+      block: 
+      - name: download OpenEBS LocalPV LVM operator
+        get_url:
+          url: "https://raw.githubusercontent.com/openebs/lvm-localpv/master/deploy/lvm-operator.yaml"
+          dest: "{{ DIR }}/workspace/lvm-operator.yaml"
+          mode: 0644
+        
+      - name: install lvm-operator.yaml
+        k8s:
+          state: present
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          src: "{{ DIR }}/workspace/lvm-operator.yaml"
+
+      - name: Verify the operator is up and running
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: Pod
+          namespace: kube-system
+          label_selectors:
+            - role = openebs-lvm
+          field_selectors:
+            - status.phase!=Running
+        register: lvm_operator_status
+        until: lvm_operator_status.resources|count == 0
+        retries: 50
+    
+    - name: Deploy LocalPV LVM storageclass
+      block:
+        - name: create storageclass definition
+          template:
+            src: templates/localpv-lvm-sc.yaml.j2
+            dest: "{{ DIR }}/workspace/localpv-lvm-sc.yml"
+
+        - name: install storageclass
+          k8s:
+            state: present
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/localpv-lvm-sc.yml"
+            
+    - name: Create PVCs
+      block:
+        - name: create PVC definition
+          template:
+            src: templates/localpv-lvm-pvc.yaml.j2
+            dest: "{{ DIR }}/workspace/pvc-{{ item.name }}.yaml"
+          vars:
+            pvc_name: "{{ item.name }}"
+            pvc_size: "{{ item.size }}"
+          loop: "{{ pvc }}"
+
+        - name: create pvc
+          k8s:
+            state: present
+            namespace: "{{ project_namespace|default('default') }}"
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/pvc-{{ item.name }}.yaml"
+          loop: "{{ pvc }}"
+
+        - name: extract the volume from the first PVC
+          k8s_info:
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            namespace: "{{ project_namespace|default('default') }}"
+            kind: PersistentVolumeClaim
+            name: "{{ pvc[0].name }}"
+            api_version: "v1"
+          register: _pvc
+          until: _pvc['resources'][0]['status']['phase'] == "Bound"
+
+        - name: save the volume name
+          set_fact:
+            pv_name: "{{ _pvc['resources'][0]['spec']['volumeName'] }}"
+
+    - name: deploy FIO pod and run a benchmark
+      block:
+        - name: Create fio.yaml
+          template:
+            src: templates/fio.yaml.j2
+            dest: "{{ DIR }}/workspace/fio.yaml"
+          vars:
+            fio_volume_name: "{{ pv_name }}"
+            fio_pvc_name: "{{ pvc[0].name }}"
+
+        - name: apply fio.yaml
+          k8s:
+            state: present
+            namespace: "{{ project_namespace|default('default') }}"
+            kubeconfig: "{{ DIR }}/workspace/admin.conf"
+            src: "{{ DIR }}/workspace/fio.yaml"
+
+        - name: wait for pod to come up
+          shell: |
+            kubectl --kubeconfig="{{ DIR }}/workspace/admin.conf" -n "{{ project_namespace|default('default') }}" -o json get pods fio
+          register: fio_pod_status
+          until: (fio_pod_status.stdout|from_json).status.phase == "Running"
+          retries: 50
+
+        - name: run benchmark
+          shell: |
+            export KUBECONFIG="{{ DIR }}/workspace/admin.conf"
+            kubectl exec -it fio -- fio --name=benchtest --size=800m --filename=/volume/test --direct=1 --rw=randrw --ioengine=libaio --bs=4k --iodepth=16 --numjobs=8 --time_based --runtime=60
+          register: bench_out
+
+        # - name: delete fio pod
+        #   k8s:
+        #     state: absent
+        #     namespace: "{{ project_namespace|default('default') }}"
+        #     kubeconfig: "{{ DIR }}/workspace/admin.conf"
+        #     src: "{{ DIR }}/workspace/fio.yaml"
+
+        - name: print out benchmark results
+          debug:
+            msg: "{{ bench_out.stdout.split('\n') }}"
+      when: run_fio|bool
+

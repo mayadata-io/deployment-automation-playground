@@ -2,10 +2,10 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: fio-mayastor
+  name: fio
 spec:
   volumes:
-    - name: mayastor-fio-volume
+    - name: fio-volume
       persistentVolumeClaim:
        claimName: {{ fio_pvc_name }}
   containers:
@@ -14,4 +14,4 @@ spec:
       command: ['sh', '-c', 'apk add fio tini && exec tini -- sleep 100000']
       volumeMounts:
         - mountPath: "/volume"
-          name: mayastor-fio-volume
+          name: fio-volume
