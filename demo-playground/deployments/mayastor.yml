@@ -158,6 +158,10 @@
         register: kubectl_get_pods_nats
         until: kubectl_get_pods_nats['resources'][0]['status']['phase'] == "Running"
         retries: 200
+        ignore_errors: true
+    
+    - debug: 
+        var: kubectl_get_pods_nats
 
     - name: CSI node plugin
       block:
@@ -299,6 +303,7 @@
           register: msp_status
           with_inventory_hostnames: mayastor_storage
           until: (msp_status.stdout|from_json).status.state == "online"
+          retries: 50
 
     - name: Create Mayastor StorageClass
       block:

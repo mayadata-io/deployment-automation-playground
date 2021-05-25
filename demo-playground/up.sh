@@ -61,7 +61,7 @@ function kubespray {
   sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
 
   # Deploy Kubespray
-  ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root cluster.yml
+  ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root -T 30 -f 1 cluster.yml
 
   # Pull out kubeconfig
   cd $DIR/workspace
@@ -130,7 +130,11 @@ EOF
   $DIR/workspace/start_vpn.sh
   # Wait for all nodes to come up and become available
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
-  ansible -m ping -i $DIR/workspace/inventory.ini -T 120 all
+  sleep 5
+  ansible -m wait_for -a "delay=5 timeout=300 port=22 search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
+
+  # ansible -m wait_for_connection -a "timeout=300 delay=1" -i $DIR/workspace/inventory.ini all
+  # ansible -m ping -i $DIR/workspace/inventory.ini -T 120 all
   cd $DIR
 }
 
@@ -184,7 +188,6 @@ else
   set -e -o pipefail
 fi
 
-
 for s in $STAGES; do
   if [[ "$s" == "prov" ]]; then
     provisioning
@@ -203,19 +206,18 @@ for s in $STAGES; do
   fi
 done
 
-prep_nodes
-
 for s in $STAGES; do
-  if [[ "$s" == "start_vpn" ]]; then
-    start_vpn
+  if [[ "$s" == "prep_nodes" ]]; then
+    prep_nodes
   fi
 done
 
+echo "Finished stages $STAGES"
+
 for p in $PLAYBOOKS; do
   cd $DIR/deployments
-  ansible-playbook -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" $p
+  ansible-playbook -vv -i $DIR/workspace/inventory.ini -e "@$DIR/workspace/ansible_vars.yml" $p
 done
-
 
 ENDTIME=$(date +%s)
 RUNTIME=$(($ENDTIME - $STARTTIME))

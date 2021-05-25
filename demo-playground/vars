@@ -11,7 +11,7 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS="localpv-lvm.yml"
+PLAYBOOKS="mayastor.yml"
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
@@ -21,8 +21,8 @@ SSH_PUBKEY=~/.ssh/id_rsa.pub
 
 
 # Kubernetes installer to use. Options are kubespray, k3s, more to be added
-K8S_INSTALLER="kubespray"
-#K8S_INSTALLER="k3s"
+#K8S_INSTALLER="kubespray"
+K8S_INSTALLER="k3s"
 KSPRAY_RELEASE="release-2.15"   # Kubespray version (git branch)
 K3S_VERSION="v1.20.4+k3s1"      # K3S version
 
@@ -86,8 +86,8 @@ MASTER_NODES='{
     os_disk_size = 60
     }'
 WORKER_NODES='{
-    count = 0
-    type = "m5.2xlarge"
+    count = 3
+    type = "m5.4xlarge"
     os_disk_size = 40
     }'
 
@@ -112,9 +112,9 @@ REPLICA_COUNT=3
 #]'
 
 PVC='[
-  {"name":"pvc0","size":"10Gi"},
-  {"name":"pvc1","size":"10Gi"},
-  {"name":"pvc2","size":"10Gi"}
+  {"name":"pvc0","size":"50Gi"},
+  {"name":"pvc1","size":"50Gi"},
+  {"name":"pvc2","size":"50Gi"}
 ]'
 
 #PVC='[{"name":"pvc0","size":"10Gi"}]'

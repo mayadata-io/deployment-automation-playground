@@ -31,6 +31,8 @@
     #iscsid is optional if nvmf mode or localPV mode are in use
     enable_iscsi: true
 
+    reboot_nodes: true
+
   tasks:
     - name: set up sysctl
       lineinfile:
@@ -44,13 +46,13 @@
         echo "{{ nr_hugepages }}" | tee /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
         sysctl -p
 
-    - name: Upgrade all packages to the latest version
-      apt:
-        name: "*"
-        state: latest
-        force_apt_get: yes
-        update_cache: yes
-      when: ansible_os_family == "Debian"
+    # - name: Upgrade all packages to the latest version
+    #   apt:
+    #     name: "*"
+    #     state: latest
+    #     force_apt_get: yes
+    #     update_cache: yes
+    #   when: ansible_os_family == "Debian"
 
     - name: Install and enable iSCSI
       block:
@@ -124,7 +126,7 @@
     - name: Reboot (because kmod reload doesn't usually work)
       reboot:
         reboot_timeout: 3600
-      when: nvme_mp_created.changed
+      when: nvme_mp_created.changed or reboot_nodes|bool
 
     - name: Populate service facts
       service_facts:
