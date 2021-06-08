@@ -58,7 +58,7 @@ function kubespray {
   #Remove the bastion group, we don't want to confuse Kubespray
   sed -i '/^bastion/d' inventory/$SETUP_NAME/inventory.ini || echo "no bastion found"
   sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
-  sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
+  #sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
 
   # Deploy Kubespray
   ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root -T 30 -f 1 cluster.yml
@@ -109,6 +109,27 @@ EOF
   export KUBECONFIG="$DIR/workspace/admin.conf"
 }
 
+function kubeadm {
+  echo "Installing with kubeadm"
+  cd $DIR
+  if [ -d ansible-kubernetes-cluster ]; then
+    cd ansible-kubernetes-cluster
+  else
+    git clone https://github.com/dyasny/ansible-kubernetes-cluster.git
+    cd ansible-kubernetes-cluster
+  fi
+  pip3 install ansible==2.9.17
+
+  ansible-playbook -i $DIR/workspace/inventory.ini -vv install-kubernetes.yml
+
+  # Pull out kubeconfig
+  cd $DIR/workspace
+  sleep 5
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$BASTION "sudo cat ~/.kube/config" > admin.conf
+  export KUBECONFIG="$DIR/workspace/admin.conf"
+}
+
+
 function start_vpn { #Start sshuttle VPN
   # List of subnets to tunnel
   VPN_SUBNETS="10.0.1.0/24 10.244.0.0/16 10.42.0.0/16 10.43.0.0/16 10.233.0.0/16"
@@ -146,6 +167,7 @@ function prep_nodes {
 
   #Create the vars file, if more variables are introduced, this will need to be extended
   cat <<EOF >$DIR/workspace/ansible_vars.yml
+setup_name: "$SETUP_NAME"
 nr_hugepages: $NR_HUGEPAGES
 DIR: "$DIR"
 limits:

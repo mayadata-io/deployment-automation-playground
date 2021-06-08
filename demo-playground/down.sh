@@ -12,7 +12,7 @@ source $DIR/vars
 cd $DIR/prov/$PLATFORM
 terraform destroy -auto-approve -var-file=$DIR/workspace/prov.tfvars
 cd $DIR
-rm -rf workspace kubespray k3s-ansible
+#rm -rf workspace kubespray k3s-ansible
 ENDTIME=$(date +%s)
 RUNTIME=$(($ENDTIME - $STARTTIME))
 secs_to_human $RUNTIME

@@ -314,6 +314,7 @@
           vars:
             replicas: "{{ replica_count|default(groups['mayastor_storage']|count) }}"
             protocol: "{{ storage_protocol }}"
+            colocated_nexus_enabled: "false"
 
         - name: create storageClass
           k8s:

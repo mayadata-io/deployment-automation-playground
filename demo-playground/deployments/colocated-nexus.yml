@@ -55,6 +55,13 @@
 - name: Install Mayastor modules
   hosts: localhost
   vars:
+    branch: "develop"
+
+    etcd_yamls:
+      - "https://raw.githubusercontent.com/openebs/Mayastor/{{ branch }}/deploy/etcd/statefulset.yaml"
+      - "https://raw.githubusercontent.com/openebs/Mayastor/{{ branch }}/deploy/etcd/svc.yaml"
+      - "https://raw.githubusercontent.com/openebs/Mayastor/{{ branch }}/deploy/etcd/svc-headless.yaml"
+
     DIR: "../workspace/"
 
     #per mayastor spec, can be "nvmf" or "iscsi"
@@ -110,7 +117,7 @@
       block:
       - name: download moac-rbac.yaml
         get_url:
-          url: "https://raw.githubusercontent.com/openebs/Mayastor/master/deploy/moac-rbac.yaml"
+          url: "https://raw.githubusercontent.com/openebs/Mayastor/{{ branch }}/deploy/moac-rbac.yaml"
           dest: "{{ DIR}}/workspace/moac-rbac.yaml"
           mode: 0644
 
@@ -124,7 +131,7 @@
       block:
       - name: download CRDs mayastorpool.yaml
         get_url:
-          url: "https://raw.githubusercontent.com/openebs/Mayastor/master/csi/moac/crds/mayastorpool.yaml"
+          url: "https://raw.githubusercontent.com/openebs/Mayastor/{{ branch }}/csi/moac/crds/mayastorpool.yaml"
           dest: "{{ DIR }}/workspace/mayastorpool.yaml"
           mode: 0644
 
@@ -142,6 +149,17 @@
           src: "files/colocated-nexus-nats.yaml"
           kubeconfig: "{{ DIR }}/workspace/admin.conf"
 
+      - name: wait for NATS pods to appear
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: Pod
+          namespace: mayastor
+          label_selectors:
+            - app = nats
+        register: kubectl_get_pods_nats
+        until: kubectl_get_pods_nats['resources']|count > 0
+        retries: 50
+
       - name: wait for NATS pods to come up
         k8s_info:
           kubeconfig: "{{ DIR }}/workspace/admin.conf"
@@ -153,6 +171,65 @@
         until: kubectl_get_pods_nats['resources'][0]['status']['phase'] == "Running"
         retries: 50
 
+    - name: deploy etcd
+      block:
+      # - name: download etcd yamls
+      #   get_url:
+      #     url: "{{ item }}"
+      #     dest: "{{ DIR }}/workspace/etcd-{{ item.split('/')[-1] }}"
+      #     mode: 0644
+      #   loop: "{{ etcd_yamls }}"
+
+      # - name: edit the etcd-statefulset for 3 replicas
+      #   lineinfile:
+      #     path: "{{ DIR }}/workspace/etcd-statefulset.yaml"
+      #     regexp: '^  replicas:'
+      #     line: '  replicas: 3'
+
+      - name: copy etcd files to workspace
+        copy:
+          src: "files/{{ item }}"
+          dest: "{{ DIR }}/workspace/{{ item }}"
+          mode: '0644'
+        loop:
+          - etcd-svc-headless.yaml
+          - etcd-svc.yaml
+      
+      - name: template out the etcd-statefulset.yaml file
+        template:
+          src: templates/etcd-statefulset.yaml.j2
+          dest: "{{ DIR }}/workspace/etcd-statefulset.yaml"
+
+      - name: deploy etcd yamls
+        k8s:
+          state: present
+          src: "{{ DIR }}/workspace/{{ item }}"
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+        loop:
+          - etcd-statefulset.yaml
+          - etcd-svc-headless.yaml
+          - etcd-svc.yaml
+
+      - name: wait for etcd to show up
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: StatefulSet
+          namespace: mayastor
+          name: mayastor-etcd
+        register: kubectl_get_statefulset_etcd
+        until: kubectl_get_statefulset_etcd['resources']|count > 0
+        retries: 50
+
+      - name: wait for etcd to come up
+        k8s_info:
+          kubeconfig: "{{ DIR }}/workspace/admin.conf"
+          kind: StatefulSet
+          namespace: mayastor
+          name: mayastor-etcd
+        register: kubectl_get_statefulset_etcd
+        until: kubectl_get_statefulset_etcd['resources'][0]['status']['currentReplicas'] == 3
+        retries: 50
+      
     - name: CSI node plugin
       block:
       - name: deploy CSI daemonset
@@ -161,7 +238,7 @@
           kubeconfig: "{{ DIR }}/workspace/admin.conf"
           src: "files/colocated-nexus-csi-daemonset.yaml"
 
-      - name: Verify that the CSI Node Plugin DaemonSet has been correctly deployed to all worker nodes in the cluster
+      - name: Verify the CSI Node Plugin DaemonSet has been correctly deployed to all worker nodes in the cluster
         k8s_info:
           kubeconfig: "{{ DIR }}/workspace/admin.conf"
           kind: DaemonSet
@@ -265,6 +342,7 @@
           vars:
             replicas: "{{ replica_count|default(groups['mayastor_storage']|count) }}"
             protocol: "{{ storage_protocol }}"
+            colocated_nexus_enabled: "true"
 
         - name: create storageClass
           k8s:

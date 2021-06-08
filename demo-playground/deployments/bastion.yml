@@ -3,6 +3,15 @@
   hosts: bastion
   #gather_facts: false
   tasks:
+    - name: Wait for bastion to become available
+      wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 10
+      vars:
+        ansible_connection: local
+    
     - name: ensure python3 is installed
       package:
         name: python3
@@ -75,3 +84,13 @@
       service:
         name: sshd
         state: restarted
+
+    - name: Wait for bastion to become available
+      wait_for:
+        port: 22
+        host: '{{ (ansible_ssh_host|default(ansible_host))|default(inventory_hostname) }}'
+        search_regex: OpenSSH
+        delay: 5
+      vars:
+        ansible_connection: local
+
