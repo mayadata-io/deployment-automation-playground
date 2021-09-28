@@ -18,6 +18,7 @@
       - nvme-core
       - nvme-tcp
       - nvmet
+      - nvme-fabrics
       - vfio-pci
 
     sysctl:
@@ -34,6 +35,18 @@
     reboot_nodes: true
 
   tasks:
+    - name: Reboot (because kmod reload doesn't usually work)
+      reboot:
+        reboot_timeout: 3600
+
+    - name: add 8.8.8.8 nameserver
+      copy:
+        dest: /etc/resolv.conf
+        force: yes
+        content: |
+          nameserver 8.8.8.8
+          search ec2.internal
+
     - name: set up sysctl
       lineinfile:
         path: /etc/sysctl.conf
@@ -89,7 +102,8 @@
           apt:
             name: "linux-modules-extra-{{ kernel_version.stdout }}"
             state: present
-            force_apt_get: yes
+            update_cache: yes
+            cache_valid_time: 86400 #One day
 
         - name: persist nvme modules across reboots (DEB)
           lineinfile:
@@ -123,13 +137,18 @@
       with_items: "{{ kmods }}"
       when: ansible_os_family == "RedHat"
 
-    - name: Reboot (because kmod reload doesn't usually work)
-      reboot:
-        reboot_timeout: 3600
-      when: nvme_mp_created.changed or reboot_nodes|bool
+    # - name: Reboot (because kmod reload doesn't usually work)
+    #   reboot:
+    #     reboot_timeout: 3600
+    #   when: nvme_mp_created.changed or reboot_nodes|bool
 
     - name: Populate service facts
       service_facts:
+
+    - name: add --node-status-update-frequency=5s to all nodes
+      shell: |
+        sudo grep 'node-status-update-frequency=5s' /var/lib/kubelet/kubeadm-flags.env && echo 0 || sudo sed -i "s/\(.\)\"$/\1 --node-status-update-frequency=5s\"/" /var/lib/kubelet/kubeadm-flags.env
+      when: ansible_facts.services["kubelet.service"] is defined
 
     - name: restart kubelet
       service:
@@ -142,3 +161,44 @@
         name: k3s-node
         state: restarted
       when: ansible_facts.services["k3s-node.service"] is defined
+
+- name: Mayastor node configuration - master nodes
+  hosts: kubemaster, kube-master, master
+  become: true
+  tasks:
+    - name: Populate service facts
+      service_facts:
+
+    - name: update /etc/kubernetes/manifests/kube-controller-manager.yaml with node-monitor-period and node-monitor-grace-period
+      lineinfile:
+        path: /etc/kubernetes/manifests/kube-controller-manager.yaml
+        line: "{{ item }}"
+        insertafter: '    - --use-service-account-credentials=true'
+      with_items:
+        - '    - --node-monitor-grace-period=20s'
+        - '    - --node-monitor-period=3s'
+      when: ansible_facts.services["kubelet.service"] is defined
+
+    - name: restart docker
+      service:
+        name: docker
+        state: restarted
+      when: ansible_facts.services["docker.service"] is defined
+  
+    - name: add --node-status-update-frequency=5s to all nodes
+      shell: |
+        sudo grep 'node-status-update-frequency=5s' /var/lib/kubelet/kubeadm-flags.env && echo 0 || sudo sed -i "s/\(.\)\"$/\1 --node-status-update-frequency=5s\"/" /var/lib/kubelet/kubeadm-flags.env
+      when: ansible_facts.services["kubelet.service"] is defined
+
+    - name: restart kubelet
+      service:
+        name: kubelet
+        state: restarted
+      when: ansible_facts.services["kubelet.service"] is defined
+
+    - name: restart k3s-node
+      service:
+        name: k3s-node
+        state: restarted
+      when: ansible_facts.services["k3s-node.service"] is defined
+

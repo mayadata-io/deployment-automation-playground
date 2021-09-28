@@ -1,0 +1,9 @@
+- hosts: mayastor_storage
+  roles:
+    - role: ./roles/ansible_role_microk8s
+      vars:
+        microk8s_version: 1.21/stable
+        microk8s_enable_HA: true
+        microk8s_group_HA: "mayastor_storage"
+
+

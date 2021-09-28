@@ -15,6 +15,11 @@ variable "k8s_installer" {
   default = "None"
 }
 
+variable "aio" {
+  type = string
+  default = "false"
+}
+
 # find other images with az vm image list --all --publisher OpenLogic --offer CentOS
 variable "image" {
   description = "Image details for the cluster nodes"

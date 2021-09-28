@@ -1,0 +1,178 @@
+- name: Install K8S prerequisites on all cluster nodes
+  hosts: all
+  become: true
+  tasks:
+    - name: create /etc/modules-load.d/k8s.conf
+      lineinfile:
+        path: "/etc/modules-load.d/k8s.conf"
+        line: "br_netfilter"
+        state: present
+
+    - name: Update sysctl
+      lineinfile:
+        path: /etc/sysctl.d/k8s.conf
+        line: "{{ item }}"
+        state: present
+      with_items:
+        - "net.bridge.bridge-nf-call-ip6tables = 1"
+        - "net.bridge.bridge-nf-call-iptables = 1"
+
+    - name: init sysctl
+      shell: |
+        sysctl --system
+
+    - name: Install Debian packages
+      block:
+      - name: Docker Installation
+        apt:
+          name: docker.io
+          state: present
+          update_cache: true
+
+      - name: install APT Transport HTTPS
+        apt:
+          name: apt-transport-https
+          state: present
+
+      - name: add Kubernetes apt-key for APT repository
+        apt_key:
+          url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+          state: present
+
+      - name: add Kubernetes APT repository
+        apt_repository:
+          repo: "deb http://apt.kubernetes.io/ kubernetes-{{ ansible_distribution_release }} main"
+          state: present
+          filename: 'kubernetes'
+
+      - name: install kubelet
+        apt:
+          name: kubelet
+          state: present
+          update_cache: true
+
+      - name: install kubeadm
+        apt:
+          name: kubeadm
+          state: present
+      when: ansible_os_family == "Debian"
+
+    - name: install EL packages
+      block:
+        - name: Disable SELinux
+          ansible.posix.selinux:
+            state: disabled
+
+        - name: remove unneeded deps
+          yum:
+            name:
+              - docker
+              - docker-client
+              - docker-client-latest
+              - docker-common
+              - docker-latest
+              - docker-latest-logrotate
+              - docker-logrotate
+              - docker-engine
+              - podman
+              - podman-docker
+            state: absent
+
+        - name: upgrade nodes to all latest packages
+          yum:
+            name: '*'
+            state: latest
+
+        - name: download docker-ce repo
+          get_url:
+            url: "https://download.docker.com/linux/centos/docker-ce.repo"
+            dest: /etc/yum.repos.d/docker-ce.repo
+            mode: '0644'
+            owner: root
+
+        - name: install docker
+          yum:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+            state: present
+
+        - name: create docker group
+          group:
+            name: docker
+            state: present
+
+        - name: add user to the docker group
+          user:
+            name: '{{ ansible_user_id }}'
+            groups: docker
+            append: yes
+
+        - name: enable docker service
+          service:
+            name: docker
+            state: started
+            enabled: yes
+
+        - name: create k8s repo
+          yum_repository:
+            name: kubernetes
+            description: kubernetes official
+            baseurl: "https://packages.cloud.google.com/yum/repos/kubernetes-el7-$basearch"
+            enabled: yes
+            gpgcheck: yes
+            repo_gpgcheck: yes
+            gpgkey: "https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg"
+
+        - name: install k8s packages
+          yum:
+            name:
+             - kubelet
+             - kubeadm
+             - kubectl
+            state: present
+
+        - name: enable kubelet service
+          service:
+            name: kubelet
+            state: started
+            enabled: yes
+      when: ansible_os_family == "RedHat"
+
+- name: Configure K8S masters
+  hosts: kube-masters
+  become: true
+  tasks:
+    - name: Start the cluster
+      shell: kubeadm init --pod-network-cidr=10.244.0.0/16 >> cluster.txt
+      args:
+        chdir: $HOME
+        creates: cluster.txt
+
+    - name: install Pod network
+      shell: kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/a70459be0084506e4ec919aa1c114638878db11b/Documentation/kube-flannel.yml >> pod_setup.txt
+      args:
+        chdir: $HOME
+        creates: pod_setup.txt
+
+    - name: get join command
+      shell: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: set join command
+      set_fact:
+        join_command: "{{ join_command_raw.stdout_lines[0] }}"
+
+- name: join nodes to the cluster
+  hosts: kube-nodes
+  become: yes
+  tasks:
+    - name: remove swap
+      shell: "swapoff -a"
+
+    - name: join cluster
+      shell: "{{ hostvars['kube-masters'].join_command }} >> node_joined.txt"
+      args:
+        chdir: $HOME
+        creates: node_joined.txt

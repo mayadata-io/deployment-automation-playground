@@ -86,7 +86,6 @@ resource "aws_instance" "storage_node" {
     delete_on_termination = true
     volume_type = "gp2"
     volume_size = var.storage_nodes.os_disk_size
-
   }
 }
 

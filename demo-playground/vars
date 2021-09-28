@@ -1,5 +1,5 @@
 # General variables
-SETUP_NAME="dyasny-maya-demo"
+SETUP_NAME="dyasny-demo"
 DEBUG_OUTPUT="true"
 
 # STAGES defines which stages in the deployment process will be performed. The available stages are "prov, start_vpn, k8s, prep_nodes
@@ -11,7 +11,8 @@ STAGES="prov start_vpn k8s prep_nodes"
 # bastion is not required if the start_vpn stage is skipped
 
 # PLAYBOOKS defines the list of playbooks (stored in the deployment directory) to run after all the stages are finished
-PLAYBOOKS="mayastor.yml"
+#PLAYBOOKS="mayastor.yml"
+PLAYBOOKS="" #colocated-nexus.yml"
 
 # SSH connection
 # NOTE: on AWS the user is preset in the AMI, and will not be respected, instead the user in OS_IMAGE will be in use, and the SSH_USER variable should match it
@@ -20,12 +21,14 @@ SSH_KEY=~/.ssh/id_rsa
 SSH_PUBKEY=~/.ssh/id_rsa.pub
 
 
-# Kubernetes installer to use. Options are kubespray, k3s, more to be added
-#K8S_INSTALLER="kubespray"
+# Kubernetes installer to use. Options are kubespray, k3s, kubeadm, microk8s
 K8S_INSTALLER="k3s"
-KSPRAY_RELEASE="release-2.15"   # Kubespray version (git branch)
-K3S_VERSION="v1.20.4+k3s1"      # K3S version
-
+KSPRAY_RELEASE="release-2.16"   # Kubespray version (git branch)
+K3S_VERSION="v1.21.2+k3s1"      # K3S version
+#K8S_VERSION="1.21.2"           # Kubeadm installer version
+K8S_VERSION="latest"
+MICROK8S_VERSION="1.21/stable"
+AIO="false"
 # Provisioning variables
 # Platform specific vars are expected here, formatting for variables follows the terraform convention#
 # NOTE: for mayastor pools to be provisioned, the device they will be on needs to be specified inside the STORAGE_NODES variable
@@ -51,7 +54,7 @@ K3S_VERSION="v1.20.4+k3s1"      # K3S version
 #    count        = 3
 #    type         = "Standard_L8s_v2"
 #    os_disk_size = 50
-#    msp          = "/dev/nvme0n1"
+#    msp          = "uring:///dev/nvme0n1"
 #    }'
 #MASTER_NODES='{
 #    count        = 1
@@ -59,7 +62,7 @@ K3S_VERSION="v1.20.4+k3s1"      # K3S version
 #    os_disk_size = 40
 #    }'
 #WORKER_NODES='{
-#    count        = 3
+#    count        = 0
 #    type         = "Standard_D8s_v4"
 #    os_disk_size = 40
 #    }'
@@ -67,41 +70,41 @@ K3S_VERSION="v1.20.4+k3s1"      # K3S version
 PLATFORM="aws"
 LOCATION="us-east-1"
 #OS_IMAGE='{
-#  ami_id = "ami-0d6e9a57f6259ba3a"
+#  ami_id = "ami-059f1cc52e6c85908"
 #  user   = "centos"
 #  }'
 OS_IMAGE='{
-    ami_id = "ami-042e8287309f5df03"
+    ami_id = "ami-0dd76f917833aac4b" 
     user   = "ubuntu"
 }'
 STORAGE_NODES='{
     count = 3
     type = "m5d.4xlarge"
     os_disk_size = 40
-    msp = "/dev/nvme1n1"
+    msp = "uring:///dev/nvme1n1"
     }'
 MASTER_NODES='{
-    count = 1 
+   count = 1 
     type = "m5.xlarge"
     os_disk_size = 60
     }'
 WORKER_NODES='{
-    count = 3
+    count = 0
     type = "m5.4xlarge"
     os_disk_size = 40
     }'
 
 #Node tuning variables
-NR_HUGEPAGES=1024
+NR_HUGEPAGES=2048
 
 #Mayastor variables
 CPU_LIMIT=2
-MEMORY_LIMIT="1024Mi"
+MEMORY_LIMIT="2048Mi"
 HUGEPAGES_2MI="2Gi"
 STORAGE_PROTOCOL="nvmf"
 PROJECT_NAMESPACE="default"
 ENABLE_ISCSI="false"
-RUN_FIO="true"
+RUN_FIO="false"
 REPLICA_COUNT=3
 
 #List of PVC dicts containing name:size
@@ -112,9 +115,9 @@ REPLICA_COUNT=3
 #]'
 
 PVC='[
-  {"name":"pvc0","size":"50Gi"},
-  {"name":"pvc1","size":"50Gi"},
-  {"name":"pvc2","size":"50Gi"}
+  {"name":"pvc0","size":"1Gi"},
+  {"name":"pvc1","size":"1Gi"},
+  {"name":"pvc2","size":"1Gi"}
 ]'
 
 #PVC='[{"name":"pvc0","size":"10Gi"}]'

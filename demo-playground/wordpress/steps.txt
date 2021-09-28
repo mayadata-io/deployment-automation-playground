@@ -1,0 +1,19 @@
+Create Mayastor PVCs pvc0 and pvc1
+
+echo -n 'MyPass123' > ./password.txt
+kubectl create secret generic mysql-pass --from-file=./password.txt
+
+
+kubectl apply -f mysql-service.yaml
+
+kubectl create -f mysql-deployment.yaml
+
+kubectl create -f wordpress-service.yaml
+
+kubectl create -f wordpress-deployment.yaml
+
+kubectl get pods -o wide
+
+kubectl get services 
+
+

@@ -15,6 +15,11 @@ variable "k8s_installer" {
   default = "None"
 }
 
+variable "aio" {
+  type = string
+  default = "false"
+}
+
 # Centos AMIs per AZ: https://wiki.centos.org/Cloud/AWS
 # Ubuntu AMIs per AZ: https://cloud-images.ubuntu.com/locator/ec2/
 variable "image" {

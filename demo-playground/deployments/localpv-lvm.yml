@@ -7,7 +7,7 @@
     - name: Create LVM VG on all the nodes
       community.general.lvg:
         vg: lvmvg
-        pvs: "{{ msp_disk }}"
+        pvs: /dev/nvme2n1
         pvresize: yes
 
     
@@ -17,13 +17,13 @@
     DIR: "../workspace/"
 
     #create the following PVCs
-    # pvc:
-    #   - name: pvc1
-    #     size: 50Gi
-    #   - name: pvc2
-    #     size: 20Gi
-    #   - name: pvc3
-    #     size: 100Gi
+    pvc:
+      - name: lvm-pvc0
+        size: 50Gi
+      - name: lvm-pvc1
+        size: 20Gi
+      - name: lvm-pvc2
+        size: 100Gi
 
     #set the required namespace here, if not set, will default to "default"
     #project_namespace: myproject

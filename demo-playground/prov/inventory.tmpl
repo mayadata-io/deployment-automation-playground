@@ -21,8 +21,21 @@ bastion ansible_host=${bastion-ip} ansible_user=${ssh_user} ansible_ssh_private_
 %{ for index, ip in master-ip ~}
 ${setup_name}-master-${index}
 %{ endfor ~}
+%{ if aio == "true" ~}
+%{ for index, ip in worker-ip ~}
+${setup_name}-worker-${index}
+%{ endfor ~}
+%{ for index, ip in storage-ip ~}
+${setup_name}-storage-${index}
+%{ endfor ~}
+%{ endif ~}
 
 [kubeworkers]
+%{ if aio == "true" ~}
+%{ for index, ip in master-ip ~}
+${setup_name}-master-${index}
+%{ endfor ~}
+%{ endif ~}
 %{ for index, ip in worker-ip ~}
 ${setup_name}-worker-${index}
 %{ endfor ~}
@@ -38,6 +51,14 @@ ${setup_name}-storage-${index}
 %{ for index, ip in master-ip ~}
 ${setup_name}-master-${index}
 %{ endfor ~}
+%{ if aio == "true" ~}
+%{ for index, ip in worker-ip ~}
+${setup_name}-worker-${index}
+%{ endfor ~}
+%{ for index, ip in storage-ip ~}
+${setup_name}-storage-${index}
+%{ endfor ~}
+%{ endif ~}
 
 [etcd]
 %{ for index, ip in master-ip ~}
@@ -59,6 +80,11 @@ ${setup_name}-storage-${index}
 %{ endif ~}
 
 [kube-node]
+%{ if aio == "true" ~}
+%{ for index, ip in master-ip ~}
+${setup_name}-master-${index}
+%{ endfor ~}
+%{ endif ~}
 %{ for index, ip in worker-ip ~}
 ${setup_name}-worker-${index}
 %{ endfor ~}
@@ -80,8 +106,21 @@ kube-node
 %{ for index, ip in master-ip ~}
 ${setup_name}-master-${index}
 %{ endfor ~}
+%{ if aio == "true" ~}
+%{ for index, ip in worker-ip ~}
+${setup_name}-worker-${index}
+%{ endfor ~}
+%{ for index, ip in storage-ip ~}
+${setup_name}-storage-${index}
+%{ endfor ~}
+%{ endif ~}
 
 [node]
+%{ if aio == "true" ~}
+%{ for index, ip in master-ip ~}
+${setup_name}-master-${index}
+%{ endfor ~}
+%{ endif ~}
 %{ for index, ip in worker-ip ~}
 ${setup_name}-worker-${index}
 %{ endfor ~}
@@ -99,8 +138,20 @@ node
 %{ for index, ip in worker-ip ~}
 ${setup_name}-worker-${index}
 %{ endfor ~}
+%{ if aio == "true" ~}
+%{ for index, ip in master-ip ~}
+${setup_name}-master-${index}
+%{ endfor ~}
+%{ endif ~}
+
 
 [mayastor_storage]
 %{ for index, ip in storage-ip ~}
 ${setup_name}-storage-${index}
 %{ endfor ~}
+%{ if aio == "true" ~}
+%{ for index, ip in master-ip ~}
+${setup_name}-master-${index}
+%{ endfor ~}
+%{ endif ~}
+

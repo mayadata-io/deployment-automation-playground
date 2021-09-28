@@ -3,6 +3,10 @@
   hosts: bastion
   #gather_facts: false
   tasks:
+    - set_fact:
+        ansible_python_interpreter: "/usr/bin/python3"
+      when: ansible_os_family == "RedHat"
+
     - name: Wait for bastion to become available
       wait_for:
         port: 22
@@ -11,6 +15,10 @@
         delay: 10
       vars:
         ansible_connection: local
+      
+    - name: If python isn't available, install it'
+      raw: yum -y install python3
+      when: ansible_os_family == "RedHat"
     
     - name: ensure python3 is installed
       package:

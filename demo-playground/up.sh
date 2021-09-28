@@ -12,13 +12,14 @@ function provisioning
   echo Provisioning VMs on $PLATFORM
   cd $DIR/prov/$PLATFORM
 
-  if [[ ! "$STAGES" == *" k8s "* ]]; then  # If k8s is not in the STAGES list
+  if [[ ! "$STAGES" == *" k8s"* ]]; then  # If k8s is not in the STAGES list
     K8S_INSTALLER="None"
   fi
 
   #Create the provisioning tfvars file, if more vars are introduced, this will need to be expanded
   cat <<EOF >$DIR/workspace/prov.tfvars
 k8s_installer = "$K8S_INSTALLER"
+aio = "$AIO"
 setup_name = "$SETUP_NAME"
 location = "$LOCATION"
 ssh_user = "$SSH_USER"
@@ -34,34 +35,62 @@ EOF
   terraform apply -auto-approve -var-file="$DIR/workspace/prov.tfvars"
 
   cp -f $DIR/prov/$PLATFORM/inventory.ini $DIR/workspace/
-  cp -f $DIR/prov/$PLATFORM/ssh.cfg $DIR/workspace/
+#  cp -f $DIR/prov/$PLATFORM/ssh.cfg $DIR/workspace/
+}
+
+function microk8s {
+  echo "Install MicroK8S $MICROK8S_VERSION"
+  cd $DIR
+  if [ ! -d $DIR/deployments/roles/ansible_role_microk8s ]; then
+    cd $DIR/deployments/roles
+    git clone https://github.com/istvano/ansible_role_microk8s.git
+    cd $DIR
+  fi
+
+  cd $DIR/deployments
+  pip3 install ansible==2.9.17
+  ansible-playbook -i $DIR/workspace/inventory.ini --become -e "microk8s_version=${MICROK8S_VERSION}" --timeout 30 microk8s.yml
+
+  # Pull out kubeconfig
+  cd $DIR/workspace
+  sleep 5
+  NODE0=`cat inventory.ini|grep -e ^${SETUP_NAME}-storage-0|head -1|awk -F'ansible_host=' '{ print $2 }'|awk '{ print $1 }'`
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $SSH_USER@$NODE0 sudo cat /var/snap/microk8s/current/credentials/client.config > admin.conf
+  KUBE_API=$(python -c "import yaml; \
+            f=open('$DIR/workspace/admin.conf','r'); \
+            y=yaml.safe_load(f); \
+            print(y['clusters'][0]['cluster']['server'])"|awk -F':' '{ print $2 }')
+  if [[ "$KUBE_API" == "//127.0.0.1" ]]; then
+    sed -i "s/127.0.0.1/$NODE0/g" $DIR/workspace/admin.conf
+  fi
 }
 
 function kubespray {
   echo "Installing Kubespray $KSPRAY_RELEASE"
   cd $DIR
-  if [ -d kubespray ]; then
-    cd kubespray
-  else
+  if [ ! -d  kubespray ]; then
     git clone https://github.com/kubernetes-sigs/kubespray.git
-    cd kubespray
   fi
+  pushd kubespray
   git checkout "$KSPRAY_RELEASE"
   pip3 install ansible==2.9.17
   pip3 install -r requirements.txt
   pip3 install openshift
   #TODO: move to virtualenv
 
-  cp -rfp inventory/sample inventory/$SETUP_NAME
-  cp -f $DIR/workspace/inventory.ini inventory/$SETUP_NAME/
+  cp -rfp $DIR/kubespray/inventory/sample $DIR/kubespray/inventory/$SETUP_NAME
+  cp -f $DIR/workspace/inventory.ini $DIR/kubespray/inventory/$SETUP_NAME/
 
   #Remove the bastion group, we don't want to confuse Kubespray
-  sed -i '/^bastion/d' inventory/$SETUP_NAME/inventory.ini || echo "no bastion found"
-  sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
-  #sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s-cluster/k8s-cluster.yml
+  sed -i '/^bastion/d' $DIR/kubespray/inventory/$SETUP_NAME/inventory.ini || echo "no bastion found"
+  sed -i "s/kube_network_plugin: calico/kube_network_plugin: flannel/g" $DIR/kubespray/inventory/$SETUP_NAME/group_vars/k8s_cluster/k8s-cluster.yml
+  sed -i '/^kube_version/d' $DIR/kubespray/inventory/$SETUP_NAME/group_vars/k8s_cluster/k8s-cluster.yml
+  echo 'kube_version: v1.21.1' >> $DIR/kubespray/inventory/$SETUP_NAME/group_vars/k8s_cluster/k8s-cluster.yml
+  #sed -i "s/cluster_name: cluster.local/cluster_name: $SETUP_NAME.local/g" inventory/$SETUP_NAME/group_vars/k8s_cluster/k8s-cluster.yml
 
   # Deploy Kubespray
-  ansible-playbook -i inventory/$SETUP_NAME/inventory.ini --become --become-user=root -T 30 -f 1 cluster.yml
+  ansible-playbook -i $DIR/kubespray/inventory/$SETUP_NAME/inventory.ini --become --become-user=root -T 30 -f 1 cluster.yml
+  pushd
 
   # Pull out kubeconfig
   cd $DIR/workspace
@@ -112,15 +141,15 @@ EOF
 function kubeadm {
   echo "Installing with kubeadm"
   cd $DIR
-  if [ -d ansible-kubernetes-cluster ]; then
-    cd ansible-kubernetes-cluster
-  else
-    git clone https://github.com/dyasny/ansible-kubernetes-cluster.git
-    cd ansible-kubernetes-cluster
-  fi
+#  if [ -d ansible-kubernetes-cluster ]; then
+#    cd ansible-kubernetes-cluster
+#  else
+#    git clone https://github.com/dyasny/ansible-kubernetes-cluster.git
+#    cd ansible-kubernetes-cluster
+#  fi
   pip3 install ansible==2.9.17
 
-  ansible-playbook -i $DIR/workspace/inventory.ini -vv install-kubernetes.yml
+  ansible-playbook -i $DIR/workspace/inventory.ini -e "k8s_version=$K8S_VERSION" -vv $DIR/kubeadm-cluster.yml
 
   # Pull out kubeconfig
   cd $DIR/workspace
@@ -153,6 +182,7 @@ EOF
   ansible -m wait_for -a "timeout=300 port=22 host=$BASTION search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
   sleep 5
   ansible -m wait_for -a "delay=5 timeout=300 port=22 search_regex=OpenSSH" -i $DIR/workspace/inventory.ini -e ansible_connection=local all
+  #ansible -i $DIR/workspace/inventory.ini -m command -a "hostnamectl set-hostname {{ inventory_hostname }}" -vv --become 'all,!bastion'
 
   # ansible -m wait_for_connection -a "timeout=300 delay=1" -i $DIR/workspace/inventory.ini all
   # ansible -m ping -i $DIR/workspace/inventory.ini -T 120 all
@@ -163,7 +193,7 @@ EOF
 function prep_nodes {
   echo "Running node_prep"
   cd $DIR/deployments
-  cp -f $DIR/workspace/ssh.cfg .
+#  cp -f $DIR/workspace/ssh.cfg .
 
   #Create the vars file, if more variables are introduced, this will need to be extended
   cat <<EOF >$DIR/workspace/ansible_vars.yml
@@ -180,6 +210,7 @@ pvc: $PVC
 project_namespace: "$PROJECT_NAMESPACE"
 run_fio: $RUN_FIO
 enable_iscsi: $ENABLE_ISCSI
+aio: $AIO
 EOF
 
   #Install prerequisite roles and collections

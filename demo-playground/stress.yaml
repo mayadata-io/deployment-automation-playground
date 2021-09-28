@@ -1,0 +1,30 @@
+#---
+#apiVersion: v1
+#kind: PersistentVolumeClaim
+#metadata:
+#  name: ms-volume-claim
+#spec:
+#  accessModes:
+#  - ReadWriteOnce
+#  resources:
+#    requests:
+#      storage: 1Gi
+#  storageClassName: mayastor-nvmf
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: fio-mayastor
+spec:
+  volumes:
+    - name: ms-volume1
+      persistentVolumeClaim:
+        claimName: pvc01
+  containers:
+    - name: fio
+      image: alpine
+      command: ['sh', '-c', 'apk add fio tini && exec tini -- sleep 100000']
+      volumeMounts:
+        - mountPath: "/volume"
+          name: ms-volume1
+

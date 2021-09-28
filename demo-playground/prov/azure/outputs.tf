@@ -11,6 +11,7 @@ resource "local_file" "AnsibleInventory" {
     ssh_key    = var.ssh_private_key
     msp_disk   = var.storage_nodes.msp
     k8s        = var.k8s_installer
+    aio        = var.aio
   })
  filename = "inventory.ini"
 }
