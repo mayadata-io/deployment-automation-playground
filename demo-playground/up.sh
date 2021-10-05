@@ -161,7 +161,8 @@ function kubeadm {
 
 function start_vpn { #Start sshuttle VPN
   # List of subnets to tunnel
-  VPN_SUBNETS="10.0.1.0/24 10.244.0.0/16 10.42.0.0/16 10.43.0.0/16 10.233.0.0/16"
+  #VPN_SUBNETS="10.0.1.0/24 10.244.0.0/16 10.42.0.0/16 10.43.0.0/16 10.233.0.0/16"
+  VPN_SUBNETS="10.0.0.0/8"
 
   cd $DIR/deployments
   BASTION=$(grep -e '^bastion' $DIR/workspace/inventory.ini|awk -F'ansible_host=' '{ print $NF }'|awk '{ print $1 }')

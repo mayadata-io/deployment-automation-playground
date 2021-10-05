@@ -24,6 +24,7 @@ export KUBECONFIG=$PWD/admin.conf
 for i in `crudini --get --list inventory.ini mayastor_storage`; do
   echo "- Label node $i"
   kubectl label nodes $i openebs.io/engine=mayastor --overwrite
+  kubectl label nodes $i node-role.kubernetes.io/worker=worker --overwrite 
 done
 sleep 10
 
@@ -126,5 +127,9 @@ echo
 #echo "- Create demo deployments"
 #kubectl apply -f $DIR/workspace/Jul26/depl.yaml
 #
+
+curl -sL https://github.com/operator-framework/operator-lifecycle-manager/releases/download/v0.18.3/install.sh | bash -s v0.18.3
+kubectl create -f https://operatorhub.io/install/node-healthcheck-operator.yaml
+
 #echo "- Access monitoring at http://$NODE_IP:$NODE_PORT"
 
