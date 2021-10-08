@@ -9,9 +9,11 @@
     deb_prerequisites:
       - open-iscsi
       - cryptsetup
+      - nfs-common
     rpm_prerequisites:
       - iscsi-initiator-utils
       - cryptsetup
+      - nfs-server
 
     # Add required kmod names below
     kmods:
@@ -67,29 +69,32 @@
     #     update_cache: yes
     #   when: ansible_os_family == "Debian"
 
-    - name: Install and enable iSCSI
+    - name: install RPM packages
+      yum:
+        name: "{{ rpm_prerequisites }}"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: install DEB packages
       block:
-        - name: install RPM packages
-          yum:
-            name: "{{ rpm_prerequisites }}"
+        - name: Install DEB packages
+          apt:
+            name: "{{ deb_prerequisites }}"
             state: present
-          when: ansible_os_family == "RedHat"
+            force_apt_get: yes
+      when: ansible_os_family == "Debian"
 
-        - name: install DEB packages
-          block:
-            - name: Install DEB packages
-              apt:
-                name: "{{ deb_prerequisites }}"
-                state: present
-                force_apt_get: yes
-          when: ansible_os_family == "Debian"
+    - name: enable and start the iscsid service
+      service:
+        name: iscsid
+        enabled: yes
+        state: started
 
-        - name: enable and start the iscsid service
-          service:
-            name: iscsid
-            enabled: yes
-            state: started
-      when: enable_iscsi|bool
+    - name: enable and start the nfs-common service
+      service:
+        name: nfs-common
+        enabled: yes
+        state: started
 
     - name: install linux-modules-extra-$(uname -r)
       block:
