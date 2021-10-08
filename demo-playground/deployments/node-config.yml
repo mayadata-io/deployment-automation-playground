@@ -75,13 +75,11 @@
         state: present
       when: ansible_os_family == "RedHat"
 
-    - name: install DEB packages
-      block:
-        - name: Install DEB packages
-          apt:
-            name: "{{ deb_prerequisites }}"
-            state: present
-            force_apt_get: yes
+    - name: Install DEB packages
+      apt:
+        name: "{{ deb_prerequisites }}"
+        state: present
+        force_apt_get: yes
       when: ansible_os_family == "Debian"
 
     - name: enable and start the iscsid service
@@ -90,11 +88,29 @@
         enabled: yes
         state: started
 
-    - name: enable and start the nfs-common service
-      service:
-        name: nfs-common
-        enabled: yes
-        state: started
+    - name: Deal with nfs-common on Ubuntu
+      block:
+        - name: check for masked service
+          shell: |
+            systemctl is-enabled nfs-common &2>/dev/null
+          register: nfs_common_svc
+
+        - name: delete service file if nfs-common is masked
+          file:
+            path: /lib/systemd/system/nfs-common.service
+            state: absent
+          when: nfs_common_svc.stdout == "masked"
+
+        - name: reload daemons
+          shell: |
+            systemctl daemon-reload
+
+        - name: enable and start the nfs-common service
+          service:
+            name: nfs-common
+            enabled: yes
+            state: started
+      when: ansible_os_family == "Debian"
 
     - name: install linux-modules-extra-$(uname -r)
       block:
